@@ -3,6 +3,7 @@
     "name": "Snapstreak",
     "slug": "snapstreak",
     "version": "1.0.0",
+    "owner": "ahmetcoskunkizilkaya",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "scheme": "snapstreak",
@@ -15,9 +16,14 @@
     },
     "ios": {
       "supportsTablet": true,
+      "bundleIdentifier": "com.ahmetcoskunkizilkaya.snapstreak",
+      "buildNumber": "1",
+      "config": {
+        "usesNonExemptEncryption": false
+      },
       "infoPlist": {
-        "NSCameraUsageDescription": "Snapstreak needs camera access to take daily snaps",
-        "NSPhotoLibraryUsageDescription": "Snapstreak needs photo library access to select photos for your snaps"
+        "NSCameraUsageDescription": "Snapstreak uses the camera to capture daily streak photos.",
+        "NSPhotoLibraryUsageDescription": "Snapstreak accesses your photos for daily streak submissions."
       }
     },
     "android": {
@@ -30,6 +36,14 @@
     },
     "web": {
       "favicon": "./assets/favicon.png"
+    },
+    "runtimeVersion": {
+      "policy": "appVersion"
+    },
+    "extra": {
+      "eas": {
+        "projectId": "FILL_IN"
+      }
     },
     "plugins": [
       "expo-router",
