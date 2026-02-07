@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
-import { View, Text, KeyboardAvoidingView, Platform, Pressable } from 'react-native';
+import { View, Text, KeyboardAvoidingView, Platform, Pressable, ScrollView } from 'react-native';
 import { Link, useRouter } from 'expo-router';
+import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../../contexts/AuthContext';
 import Button from '../../components/ui/Button';
 import Input from '../../components/ui/Input';
@@ -43,67 +44,88 @@ export default function LoginScreen() {
       className="flex-1 bg-gray-950"
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
     >
-      <View className="flex-1 justify-center px-8">
-        <Text className="mb-2 text-3xl font-bold text-white">
-          Welcome back
-        </Text>
-        <Text className="mb-8 text-base text-gray-400">
-          Sign in to your account
-        </Text>
-
-        {error ? (
-          <View className="mb-4 rounded-lg bg-red-900/30 p-3">
-            <Text className="text-sm text-red-400">{error}</Text>
-          </View>
-        ) : null}
-
-        <View className="mb-4">
-          <Input
-            label="Email"
-            placeholder="you@example.com"
-            value={email}
-            onChangeText={setEmail}
-            autoCapitalize="none"
-            keyboardType="email-address"
-            textContentType="emailAddress"
-          />
-        </View>
-
-        <View className="mb-6">
-          <Input
-            label="Password"
-            placeholder="Your password"
-            value={password}
-            onChangeText={setPassword}
-            secureTextEntry
-            textContentType="password"
-          />
-        </View>
-
-        <Button
-          title="Sign In"
-          onPress={handleLogin}
-          isLoading={isLoading}
-          size="lg"
-        />
-
-        {/* Sign in with Apple -- equal visual prominence (Guideline 4.8) */}
-        <AppleSignInButton onError={(msg) => setError(msg)} />
-
-        {/* Try Without Account */}
-        <Pressable onPress={handleGuestMode} className="mt-5 items-center py-3">
-          <Text className="text-base font-semibold text-orange-500">
-            Try Without Account
+      <ScrollView
+        className="flex-1"
+        contentContainerStyle={{ flexGrow: 1 }}
+        keyboardShouldPersistTaps="handled"
+      >
+        {/* Decorative Header */}
+        <View
+          className="bg-orange-600 items-center justify-center"
+          style={{
+            height: 180,
+            borderBottomLeftRadius: 24,
+            borderBottomRightRadius: 24,
+          }}
+        >
+          <Ionicons name="flame" size={48} color="white" />
+          <Text className="text-white text-2xl font-bold mt-2">
+            Snapstreak
           </Text>
-        </Pressable>
-
-        <View className="mt-4 flex-row items-center justify-center">
-          <Text className="text-gray-400">Don't have an account? </Text>
-          <Link href="/(auth)/register" asChild>
-            <Text className="font-semibold text-orange-500">Sign Up</Text>
-          </Link>
         </View>
-      </View>
+
+        <View className="flex-1 justify-center px-8 pt-8">
+          <Text className="mb-2 text-3xl font-bold text-white">
+            Welcome back
+          </Text>
+          <Text className="mb-8 text-base text-gray-400">
+            Sign in to your account
+          </Text>
+
+          {error ? (
+            <View className="mb-4 rounded-lg bg-red-900/30 p-3">
+              <Text className="text-sm text-red-400">{error}</Text>
+            </View>
+          ) : null}
+
+          <View className="mb-4">
+            <Input
+              label="Email"
+              placeholder="you@example.com"
+              value={email}
+              onChangeText={setEmail}
+              autoCapitalize="none"
+              keyboardType="email-address"
+              textContentType="emailAddress"
+            />
+          </View>
+
+          <View className="mb-6">
+            <Input
+              label="Password"
+              placeholder="Your password"
+              value={password}
+              onChangeText={setPassword}
+              secureTextEntry
+              textContentType="password"
+            />
+          </View>
+
+          <Button
+            title="Sign In"
+            onPress={handleLogin}
+            isLoading={isLoading}
+            size="lg"
+          />
+
+          {/* Sign in with Apple -- equal visual prominence (Guideline 4.8) */}
+          <AppleSignInButton onError={(msg) => setError(msg)} />
+
+          {/* Try Without Account */}
+          <Pressable onPress={handleGuestMode} className="mt-5 items-center py-3">
+            <Text className="text-base font-semibold text-orange-500">
+              Try Without Account
+            </Text>
+          </Pressable>
+
+          <View className="mt-4 flex-row items-center justify-center pb-8">
+            <Text className="text-gray-400">Don't have an account? </Text>
+            <Link href="/(auth)/register" asChild>
+              <Text className="font-semibold text-orange-500">Sign Up</Text>
+            </Link>
+          </View>
+        </View>
+      </ScrollView>
     </KeyboardAvoidingView>
   );
 }

@@ -136,6 +136,10 @@ func (s *AuthService) DeleteAccount(userID uuid.UUID, password string) error {
 		// Remove blocks
 		tx.Where("blocker_id = ? OR blocked_id = ?", userID, userID).Delete(&models.Block{})
 
+		// Remove snap data (Snapstreak-specific cleanup)
+		tx.Where("user_id = ?", userID).Delete(&models.Snap{})
+		tx.Where("user_id = ?", userID).Delete(&models.SnapStreak{})
+
 		// Soft-delete the user (GORM DeletedAt)
 		return tx.Delete(&user).Error
 	})

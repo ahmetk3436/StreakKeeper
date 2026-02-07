@@ -1,33 +1,63 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, Pressable, Alert, Switch } from 'react-native';
+import {
+  View,
+  Text,
+  Pressable,
+  Alert,
+  Switch,
+  ScrollView,
+  Linking,
+} from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../../contexts/AuthContext';
+import { useSubscription } from '../../contexts/SubscriptionContext';
 import { isBiometricAvailable, getBiometricType } from '../../lib/biometrics';
-import { hapticWarning, hapticMedium } from '../../lib/haptics';
+import { hapticWarning, hapticMedium, hapticSuccess } from '../../lib/haptics';
+import api from '../../lib/api';
 import Button from '../../components/ui/Button';
 import Modal from '../../components/ui/Modal';
 import Input from '../../components/ui/Input';
+import type { SnapStreak } from '../../types/snap';
 
 export default function SettingsScreen() {
   const { user, logout, deleteAccount, isGuest } = useAuth();
+  const { handleRestore } = useSubscription();
   const router = useRouter();
   const [biometricType, setBiometricType] = useState<string | null>(null);
   const [biometricEnabled, setBiometricEnabled] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [deletePassword, setDeletePassword] = useState('');
   const [isDeleting, setIsDeleting] = useState(false);
+  const [streak, setStreak] = useState<SnapStreak | null>(null);
+  const [dailyReminder, setDailyReminder] = useState(false);
 
   useEffect(() => {
-    const checkBiometrics = async () => {
+    const init = async () => {
       const available = await isBiometricAvailable();
       if (available) {
         const type = await getBiometricType();
         setBiometricType(type);
       }
+
+      // Load daily reminder setting
+      const reminder = await AsyncStorage.getItem('daily_reminder_enabled');
+      setDailyReminder(reminder === 'true');
+
+      // Fetch streak data
+      if (!isGuest) {
+        try {
+          const { data } = await api.get<SnapStreak>('/snaps/streak');
+          setStreak(data);
+        } catch (error) {
+          console.error('Failed to fetch streak:', error);
+        }
+      }
     };
-    checkBiometrics();
-  }, []);
+    init();
+  }, [isGuest]);
 
   const handleDeleteAccount = async () => {
     setIsDeleting(true);
@@ -60,15 +90,25 @@ export default function SettingsScreen() {
     );
   };
 
-  // Restore Purchases (Guideline 3.1 -- required on every paywall)
-  const handleRestorePurchases = () => {
+  const handleRestorePurchases = async () => {
     hapticMedium();
-    Alert.alert('Restore Purchases', 'Checking for previous purchases...');
+    const success = await handleRestore();
+    if (success) {
+      hapticSuccess();
+      Alert.alert('Success', 'Purchases restored!');
+    } else {
+      Alert.alert('Not Found', 'No previous purchases found.');
+    }
+  };
+
+  const toggleDailyReminder = async (value: boolean) => {
+    setDailyReminder(value);
+    await AsyncStorage.setItem('daily_reminder_enabled', value.toString());
   };
 
   return (
     <SafeAreaView className="flex-1 bg-gray-950" edges={['top']}>
-      <View className="flex-1 px-6 pt-8">
+      <ScrollView className="flex-1 px-6 pt-8" showsVerticalScrollIndicator={false}>
         <Text className="mb-8 text-3xl font-bold text-white">Settings</Text>
 
         {/* Guest CTA */}
@@ -84,6 +124,35 @@ export default function SettingsScreen() {
               Sign up to unlock unlimited streaks and save your progress.
             </Text>
           </Pressable>
+        )}
+
+        {/* Streak Section */}
+        {!isGuest && streak && (
+          <>
+            <Text className="mb-3 text-xs font-semibold uppercase tracking-wider text-gray-500">
+              Streak
+            </Text>
+            <View className="mb-6 rounded-xl bg-gray-900 p-4">
+              <View className="flex-row items-center justify-between mb-2">
+                <Text className="text-sm text-gray-400">Current Streak</Text>
+                <Text className="text-base font-semibold text-white">
+                  {streak.current_streak} days
+                </Text>
+              </View>
+              <View className="flex-row items-center justify-between mb-2">
+                <Text className="text-sm text-gray-400">Longest Streak</Text>
+                <Text className="text-base font-semibold text-white">
+                  {streak.longest_streak} days
+                </Text>
+              </View>
+              <View className="flex-row items-center justify-between">
+                <Text className="text-sm text-gray-400">Total Snaps</Text>
+                <Text className="text-base font-semibold text-white">
+                  {streak.total_snaps}
+                </Text>
+              </View>
+            </View>
+          </>
         )}
 
         {/* Account Section */}
@@ -134,6 +203,28 @@ export default function SettingsScreen() {
           </>
         )}
 
+        {/* Notifications Section */}
+        <Text className="mb-3 text-xs font-semibold uppercase tracking-wider text-gray-500">
+          Notifications
+        </Text>
+        <View className="mb-6 rounded-xl bg-gray-900">
+          <View className="flex-row items-center justify-between p-4">
+            <View>
+              <Text className="text-base font-medium text-white">
+                Daily Reminder
+              </Text>
+              <Text className="text-sm text-gray-500">
+                Get reminded to snap every day
+              </Text>
+            </View>
+            <Switch
+              value={dailyReminder}
+              onValueChange={toggleDailyReminder}
+              trackColor={{ true: '#f97316' }}
+            />
+          </View>
+        </View>
+
         {/* Guest Sign Out */}
         {isGuest && (
           <>
@@ -162,13 +253,40 @@ export default function SettingsScreen() {
           </Pressable>
         </View>
 
+        {/* About Section */}
+        <Text className="mb-3 text-xs font-semibold uppercase tracking-wider text-gray-500">
+          About
+        </Text>
+        <View className="mb-6 rounded-xl bg-gray-900">
+          <View className="flex-row items-center justify-between p-4 border-b border-gray-800">
+            <Text className="text-base text-white">Version</Text>
+            <Text className="text-base text-gray-500">1.0.0</Text>
+          </View>
+          <Pressable
+            className="p-4 border-b border-gray-800"
+            onPress={() =>
+              Linking.openURL('https://snapstreak.app/privacy')
+            }
+          >
+            <Text className="text-base text-white">Privacy Policy</Text>
+          </Pressable>
+          <Pressable
+            className="p-4"
+            onPress={() =>
+              Linking.openURL('https://snapstreak.app/terms')
+            }
+          >
+            <Text className="text-base text-white">Terms of Service</Text>
+          </Pressable>
+        </View>
+
         {/* Danger Zone -- Account Deletion (Guideline 5.1.1) */}
         {!isGuest && (
           <>
             <Text className="mb-3 text-xs font-semibold uppercase tracking-wider text-gray-500">
               Danger Zone
             </Text>
-            <View className="rounded-xl bg-red-950/50">
+            <View className="rounded-xl bg-red-950/50 mb-8">
               <Pressable className="p-4" onPress={confirmDelete}>
                 <Text className="text-base font-medium text-red-500">
                   Delete Account
@@ -180,7 +298,9 @@ export default function SettingsScreen() {
             </View>
           </>
         )}
-      </View>
+
+        <View className="h-4" />
+      </ScrollView>
 
       {/* Delete Account Confirmation Modal */}
       <Modal

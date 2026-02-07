@@ -14,6 +14,7 @@ func Setup(
 	healthHandler *handlers.HealthHandler,
 	webhookHandler *handlers.WebhookHandler,
 	moderationHandler *handlers.ModerationHandler,
+	snapHandler *handlers.SnapHandler,
 ) {
 	api := app.Group("/api")
 
@@ -31,6 +32,13 @@ func Setup(
 	protected := api.Group("", middleware.JWTProtected(cfg))
 	protected.Post("/auth/logout", authHandler.Logout)
 	protected.Delete("/auth/account", authHandler.DeleteAccount) // Account deletion (Guideline 5.1.1)
+
+	// Snap routes (protected)
+	protected.Post("/snaps", snapHandler.CreateSnap)
+	protected.Get("/snaps", snapHandler.GetMySnaps)
+	protected.Get("/snaps/streak", snapHandler.GetStreak)
+	protected.Delete("/snaps/:id", snapHandler.DeleteSnap)
+	protected.Post("/snaps/:id/like", snapHandler.LikeSnap)
 
 	// Moderation - User endpoints (protected)
 	protected.Post("/reports", moderationHandler.CreateReport)     // Report content (Guideline 1.2)

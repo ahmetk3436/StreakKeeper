@@ -42,12 +42,14 @@ func main() {
 	authService := services.NewAuthService(database.DB, cfg)
 	subscriptionService := services.NewSubscriptionService(database.DB)
 	moderationService := services.NewModerationService(database.DB)
+	snapService := services.NewSnapService(database.DB)
 
 	// Handlers
 	authHandler := handlers.NewAuthHandler(authService)
 	healthHandler := handlers.NewHealthHandler()
 	webhookHandler := handlers.NewWebhookHandler(subscriptionService, cfg)
 	moderationHandler := handlers.NewModerationHandler(moderationService)
+	snapHandler := handlers.NewSnapHandler(snapService)
 
 	// Fiber app
 	app := fiber.New(fiber.Config{
@@ -72,7 +74,7 @@ func main() {
 	app.Use("/api/auth", authLimiter)
 
 	// Routes
-	routes.Setup(app, cfg, authHandler, healthHandler, webhookHandler, moderationHandler)
+	routes.Setup(app, cfg, authHandler, healthHandler, webhookHandler, moderationHandler, snapHandler)
 
 	// Graceful shutdown
 	quit := make(chan os.Signal, 1)
