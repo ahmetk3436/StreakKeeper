@@ -14,7 +14,7 @@ const API_BASE_URL =
 
 const api = axios.create({
   baseURL: API_BASE_URL,
-  timeout: 15000,
+  timeout: 30000, // Increased for file uploads
   headers: { 'Content-Type': 'application/json' },
 });
 
@@ -24,6 +24,10 @@ api.interceptors.request.use(
     const token = await getAccessToken();
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
+    }
+    // Don't override Content-Type for multipart/form-data — let FormData set the boundary
+    if (config.headers?.['Content-Type'] === 'multipart/form-data') {
+      delete config.headers['Content-Type'];
     }
     return config;
   },

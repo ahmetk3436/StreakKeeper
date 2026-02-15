@@ -52,9 +52,14 @@ func main() {
 	snapHandler := handlers.NewSnapHandler(snapService)
 	legalHandler := handlers.NewLegalHandler()
 
+	// Create uploads directory for snap images
+	if err := os.MkdirAll("./uploads/snaps", 0755); err != nil {
+		log.Printf("Warning: Could not create uploads directory: %v", err)
+	}
+
 	// Fiber app
 	app := fiber.New(fiber.Config{
-		BodyLimit:    4 * 1024 * 1024, // 4MB
+		BodyLimit:    12 * 1024 * 1024, // 12MB (10MB image + form overhead)
 		ErrorHandler: customErrorHandler,
 	})
 
@@ -65,6 +70,9 @@ func main() {
 		Format: "${time} | ${status} | ${latency} | ${ip} | ${method} | ${path}\n",
 	}))
 	app.Use(middleware.CORS(cfg))
+
+	// Serve static files for uploaded images
+	app.Static("/uploads", "./uploads")
 
 	// Rate limiter on auth endpoints
 	authLimiter := limiter.New(limiter.Config{

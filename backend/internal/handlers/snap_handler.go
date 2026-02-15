@@ -2,6 +2,9 @@ package handlers
 
 import (
 	"errors"
+	"fmt"
+	"os"
+	"path/filepath"
 
 	"github.com/ahmetcoskunkizilkaya/fully-autonomous-mobile-system/backend/internal/dto"
 	"github.com/ahmetcoskunkizilkaya/fully-autonomous-mobile-system/backend/internal/services"
@@ -17,7 +20,7 @@ func NewSnapHandler(snapService *services.SnapService) *SnapHandler {
 	return &SnapHandler{snapService: snapService}
 }
 
-// CreateSnap handles POST /snaps — creates a new snap for the authenticated user.
+// CreateSnap handles POST /snaps — creates a new snap with multipart/form-data image upload.
 func (h *SnapHandler) CreateSnap(c *fiber.Ctx) error {
 	userID, err := extractUserID(c)
 	if err != nil {
@@ -26,15 +29,63 @@ func (h *SnapHandler) CreateSnap(c *fiber.Ctx) error {
 		})
 	}
 
-	var req dto.CreateSnapRequest
-	if err := c.BodyParser(&req); err != nil {
+	// Get the uploaded file
+	file, err := c.FormFile("image")
+	if err != nil {
 		return c.Status(fiber.StatusBadRequest).JSON(dto.ErrorResponse{
-			Error: true, Message: "Invalid request body",
+			Error: true, Message: "Image file is required",
 		})
 	}
 
-	snap, err := h.snapService.CreateSnap(userID, req.ImageURL, req.Caption, req.Filter)
+	// Validate file size (max 10MB)
+	if file.Size > 10*1024*1024 {
+		return c.Status(fiber.StatusBadRequest).JSON(dto.ErrorResponse{
+			Error: true, Message: "Image size must be less than 10MB",
+		})
+	}
+
+	// Validate content type
+	contentType := file.Header.Get("Content-Type")
+	validTypes := map[string]bool{
+		"image/jpeg": true,
+		"image/jpg":  true,
+		"image/png":  true,
+		"image/heic": true,
+	}
+	if !validTypes[contentType] {
+		return c.Status(fiber.StatusBadRequest).JSON(dto.ErrorResponse{
+			Error: true, Message: "Invalid image format. Only JPEG, PNG, and HEIC are allowed",
+		})
+	}
+
+	// Parse caption and filter from form fields
+	caption := c.FormValue("caption", "")
+	filter := c.FormValue("filter", "none")
+
+	// Generate unique filename
+	fileExt := filepath.Ext(file.Filename)
+	if fileExt == "" {
+		fileExt = ".jpg"
+	}
+	filename := fmt.Sprintf("%s_%s%s", userID.String()[:8], uuid.New().String()[:8], fileExt)
+
+	// Save the file
+	uploadDir := "./uploads/snaps"
+	savePath := filepath.Join(uploadDir, filename)
+	if err := c.SaveFile(file, savePath); err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(dto.ErrorResponse{
+			Error: true, Message: "Failed to save image",
+		})
+	}
+
+	// Generate accessible URL path
+	imageURL := fmt.Sprintf("/uploads/snaps/%s", filename)
+
+	// Create snap via service (handles streak update too)
+	snap, err := h.snapService.CreateSnap(userID, imageURL, caption, filter)
 	if err != nil {
+		// Clean up uploaded file if database save fails
+		os.Remove(savePath)
 		if errors.Is(err, services.ErrInvalidFilter) {
 			return c.Status(fiber.StatusBadRequest).JSON(dto.ErrorResponse{
 				Error: true, Message: err.Error(),
@@ -83,12 +134,18 @@ func (h *SnapHandler) GetMySnaps(c *fiber.Ctx) error {
 		})
 	}
 
+	// Build full URLs for images
+	baseURL := c.Protocol() + "://" + c.Hostname()
 	snapResponses := make([]dto.SnapResponse, len(snaps))
 	for i, snap := range snaps {
+		imageURL := snap.ImageURL
+		if len(imageURL) > 0 && imageURL[0] == '/' {
+			imageURL = baseURL + imageURL
+		}
 		snapResponses[i] = dto.SnapResponse{
 			ID:        snap.ID.String(),
 			UserID:    snap.UserID.String(),
-			ImageURL:  snap.ImageURL,
+			ImageURL:  imageURL,
 			Caption:   snap.Caption,
 			Filter:    snap.Filter,
 			SnapDate:  snap.SnapDate,

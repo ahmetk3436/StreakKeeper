@@ -7,10 +7,12 @@ import {
   Image,
   Alert,
   TextInput,
+  ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter, useLocalSearchParams } from 'expo-router';
+import * as Haptics from 'expo-haptics';
 import api from '../../lib/api';
 import { hapticSuccess, hapticLight } from '../../lib/haptics';
 
@@ -40,18 +42,44 @@ export default function SnapCreateScreen() {
 
     setIsPosting(true);
     try {
-      await api.post('/snaps', {
-        image_url: imageUri,
-        caption,
-        filter: selectedFilter,
+      await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+
+      // Create FormData for multipart upload
+      const formData = new FormData();
+
+      // Determine file extension and mime type
+      const fileExtension = imageUri.split('.').pop()?.toLowerCase() || 'jpg';
+      const mimeType = fileExtension === 'png' ? 'image/png' :
+                       fileExtension === 'heic' ? 'image/heic' : 'image/jpeg';
+      const fileName = `snap_${Date.now()}.${fileExtension}`;
+
+      // Append image file
+      formData.append('image', {
+        uri: imageUri,
+        name: fileName,
+        type: mimeType,
+      } as any);
+
+      // Append caption and filter
+      formData.append('caption', caption);
+      formData.append('filter', selectedFilter);
+
+      // Post with multipart/form-data
+      await api.post('/snaps', formData, {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+        },
       });
+
       hapticSuccess();
-      router.back();
+      router.replace({
+        pathname: '/(protected)/home',
+        params: { snapPosted: 'true' },
+      });
     } catch (error: any) {
-      Alert.alert(
-        'Error',
-        error.response?.data?.message || 'Failed to post snap'
-      );
+      await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+      const errorMessage = error.response?.data?.message || 'Failed to post snap. Please try again.';
+      Alert.alert('Error', errorMessage);
     } finally {
       setIsPosting(false);
     }
@@ -71,9 +99,11 @@ export default function SnapCreateScreen() {
           className="p-2"
           style={{ opacity: isPosting ? 0.5 : 1 }}
         >
-          <Text className="text-orange-500 font-bold text-base">
-            {isPosting ? 'Posting...' : 'Post'}
-          </Text>
+          {isPosting ? (
+            <ActivityIndicator size="small" color="#f97316" />
+          ) : (
+            <Text className="text-orange-500 font-bold text-base">Post</Text>
+          )}
         </Pressable>
       </View>
 
