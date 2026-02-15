@@ -6,6 +6,7 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 import * as Notifications from 'expo-notifications';
 import { AuthProvider } from '../contexts/AuthContext';
 import { SubscriptionProvider } from '../contexts/SubscriptionContext';
+import ErrorBoundary from '../components/ErrorBoundary';
 
 // Configure notification handling behavior
 Notifications.setNotificationHandler({
@@ -20,13 +21,15 @@ Notifications.setNotificationHandler({
 
 export default function RootLayout() {
   return (
-    <SafeAreaProvider>
-      <AuthProvider>
-        <SubscriptionProvider>
-          <StatusBar style="light" backgroundColor="#030712" />
-          <Slot />
-        </SubscriptionProvider>
-      </AuthProvider>
-    </SafeAreaProvider>
+    <ErrorBoundary>
+      <SafeAreaProvider>
+        <AuthProvider>
+          <SubscriptionProvider>
+            <StatusBar style="light" backgroundColor="#030712" />
+            <Slot />
+          </SubscriptionProvider>
+        </AuthProvider>
+      </SafeAreaProvider>
+    </ErrorBoundary>
   );
 }
