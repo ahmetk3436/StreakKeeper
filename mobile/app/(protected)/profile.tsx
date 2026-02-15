@@ -1,10 +1,11 @@
-import React, { useState, useEffect } from 'react';
-import { View, Text, ScrollView, Pressable } from 'react-native';
+import React, { useState, useEffect, useCallback } from 'react';
+import { View, Text, ScrollView, Pressable, ActivityIndicator, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useAuth } from '../../contexts/AuthContext';
 import api from '../../lib/api';
+import * as Haptics from 'expo-haptics';
 import Skeleton from '../../components/ui/Skeleton';
 import type { SnapStreak } from '../../types/snap';
 
@@ -23,29 +24,77 @@ const ACHIEVEMENTS: Achievement[] = [
   { days: 30, label: 'Unstoppable', icon: 'diamond-outline', color: '#b9f2ff', bgColor: 'rgba(185,242,255,0.1)' },
 ];
 
+interface ProfileData {
+  id: string;
+  email: string;
+  created_at: string;
+}
+
 export default function ProfileScreen() {
-  const { user, isGuest } = useAuth();
+  const { user, isGuest, logout } = useAuth();
   const router = useRouter();
   const [streak, setStreak] = useState<SnapStreak | null>(null);
+  const [profile, setProfile] = useState<ProfileData | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  const fetchProfileData = useCallback(async () => {
+    if (isGuest) {
+      setIsLoading(false);
+      return;
+    }
+    setIsLoading(true);
+    setError(null);
+    try {
+      const [profileResponse, streakResponse] = await Promise.all([
+        api.get('/auth/profile'),
+        api.get<SnapStreak>('/snaps/streak'),
+      ]);
+      setProfile(profileResponse.data.data);
+      setStreak(streakResponse.data);
+    } catch (err: any) {
+      setError(err.message || 'Failed to load profile');
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+    } finally {
+      setIsLoading(false);
+    }
+  }, [isGuest]);
 
   useEffect(() => {
-    const fetchData = async () => {
-      if (isGuest) {
-        setIsLoading(false);
-        return;
-      }
-      try {
-        const { data } = await api.get<SnapStreak>('/snaps/streak');
-        setStreak(data);
-      } catch (error) {
-        console.error('Failed to fetch streak:', error);
-      } finally {
-        setIsLoading(false);
-      }
-    };
-    fetchData();
-  }, [isGuest]);
+    fetchProfileData();
+  }, [fetchProfileData]);
+
+  const formatMemberSince = (dateString: string): string => {
+    const date = new Date(dateString);
+    return date.toLocaleDateString('en-US', {
+      month: 'short',
+      year: 'numeric',
+    });
+  };
+
+  const handleDeleteAccount = () => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    Alert.alert(
+      'Delete Account',
+      'Are you sure you want to delete your account? This action cannot be undone.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              await api.delete('/auth/account');
+              await logout();
+              router.replace('/');
+            } catch (err) {
+              Alert.alert('Error', 'Failed to delete account');
+            }
+          },
+        },
+      ]
+    );
+  };
 
   if (isLoading) {
     return (
@@ -71,7 +120,7 @@ export default function ProfileScreen() {
     );
   }
 
-  const firstLetter = (user?.email || 'G').charAt(0).toUpperCase();
+  const firstLetter = (profile?.email || user?.email || 'G').charAt(0).toUpperCase();
 
   return (
     <SafeAreaView className="flex-1 bg-gray-950" edges={['top']}>
@@ -84,12 +133,25 @@ export default function ProfileScreen() {
             </Text>
           </View>
           <Text className="text-base text-gray-400 mt-2">
-            {isGuest ? 'Guest User' : user?.email}
+            {isGuest ? 'Guest User' : (profile?.email || user?.email)}
           </Text>
           <Text className="text-sm text-gray-600 mt-1">
-            Member since Feb 2026
+            {profile ? `Member since ${formatMemberSince(profile.created_at)}` : (isGuest ? 'Guest Mode' : 'Loading...')}
           </Text>
         </View>
+
+        {/* Error State */}
+        {error && (
+          <View className="mx-6 mb-4 bg-red-900/20 rounded-2xl p-4">
+            <Text className="text-red-400 text-center">{error}</Text>
+            <Pressable
+              onPress={fetchProfileData}
+              className="mt-2 bg-red-900/30 rounded-xl py-2 items-center"
+            >
+              <Text className="text-red-400 font-semibold">Retry</Text>
+            </Pressable>
+          </View>
+        )}
 
         {/* Streak Stats */}
         <View className="flex-row mx-6 gap-2">
@@ -190,7 +252,10 @@ export default function ProfileScreen() {
         {/* Quick Links */}
         <View className="mx-6 mt-8 mb-8">
           <Pressable
-            onPress={() => router.push('/(protected)/settings')}
+            onPress={() => {
+              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+              router.push('/(protected)/settings');
+            }}
             className="flex-row items-center justify-between p-4 border-b border-gray-800"
           >
             <View className="flex-row items-center">
@@ -200,7 +265,10 @@ export default function ProfileScreen() {
             <Ionicons name="chevron-forward" size={20} color="#6b7280" />
           </Pressable>
           <Pressable
-            onPress={() => router.push('/(protected)/paywall')}
+            onPress={() => {
+              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+              router.push('/(protected)/paywall');
+            }}
             className="flex-row items-center justify-between p-4 border-b border-gray-800"
           >
             <View className="flex-row items-center">
@@ -211,6 +279,34 @@ export default function ProfileScreen() {
             </View>
             <Ionicons name="chevron-forward" size={20} color="#6b7280" />
           </Pressable>
+          {!isGuest && (
+            <>
+              <Pressable
+                onPress={() => {
+                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+                  logout();
+                  router.replace('/');
+                }}
+                className="flex-row items-center justify-between p-4 border-b border-gray-800"
+              >
+                <View className="flex-row items-center">
+                  <Ionicons name="log-out-outline" size={20} color="#9ca3af" />
+                  <Text className="text-base text-white ml-3">Sign Out</Text>
+                </View>
+                <Ionicons name="chevron-forward" size={20} color="#6b7280" />
+              </Pressable>
+              <Pressable
+                onPress={handleDeleteAccount}
+                className="flex-row items-center justify-between p-4"
+              >
+                <View className="flex-row items-center">
+                  <Ionicons name="trash-outline" size={20} color="#ef4444" />
+                  <Text className="text-base text-red-500 ml-3">Delete Account</Text>
+                </View>
+                <Ionicons name="chevron-forward" size={20} color="#6b7280" />
+              </Pressable>
+            </>
+          )}
         </View>
       </ScrollView>
     </SafeAreaView>

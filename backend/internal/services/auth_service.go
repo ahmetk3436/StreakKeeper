@@ -100,6 +100,19 @@ func (s *AuthService) Refresh(req *dto.RefreshRequest) (*dto.AuthResponse, error
 	return s.generateTokenPair(&user)
 }
 
+// GetProfile retrieves the user profile by user ID
+func (s *AuthService) GetProfile(userID uuid.UUID) (*dto.ProfileResponse, error) {
+	var user models.User
+	if err := s.db.Where("id = ?", userID).First(&user).Error; err != nil {
+		return nil, ErrUserNotFound
+	}
+	return &dto.ProfileResponse{
+		ID:        user.ID.String(),
+		Email:     user.Email,
+		CreatedAt: user.CreatedAt.Format(time.RFC3339),
+	}, nil
+}
+
 func (s *AuthService) Logout(req *dto.LogoutRequest) error {
 	tokenHash := hashToken(req.RefreshToken)
 	return s.db.Model(&models.RefreshToken{}).

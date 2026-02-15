@@ -36,6 +36,7 @@ func Setup(
 	// Auth (protected)
 	protected := api.Group("", middleware.JWTProtected(cfg))
 	protected.Post("/auth/logout", authHandler.Logout)
+	protected.Get("/auth/profile", authHandler.GetProfile)
 	protected.Delete("/auth/account", authHandler.DeleteAccount) // Account deletion (Guideline 5.1.1)
 
 	// Snap routes (protected)

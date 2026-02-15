@@ -41,3 +41,10 @@ type HealthResponse struct {
 	Timestamp string `json:"timestamp"`
 	DB        string `json:"db"`
 }
+
+// ProfileResponse represents the user profile data returned by the API
+type ProfileResponse struct {
+	ID        string `json:"id"`
+	Email     string `json:"email"`
+	CreatedAt string `json:"created_at"`
+}

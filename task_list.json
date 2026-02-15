@@ -4,25 +4,25 @@
       "id": "enhance_001",
       "title": "Add image upload endpoint with file storage",
       "description": "CRITICAL: The app currently sends a local file URI (e.g., file:///...) as image_url to POST /snaps, but the backend just stores this string in the database. This means images are never actually uploaded — they only exist on the device and cannot be retrieved later or on another device.\n\nModify backend/internal/handlers/snap_handler.go:\n- Change CreateSnap handler to accept multipart/form-data instead of JSON\n- Parse file upload: `file, err := c.FormFile(\"image\")`\n- Parse caption and filter from form fields: `c.FormValue(\"caption\")`, `c.FormValue(\"filter\")`\n- Create upload directory: `uploads/snaps/` relative to working dir\n- Generate unique filename: `fmt.Sprintf(\"%s_%s%s\", userID.String()[:8], uuid.New().String()[:8], filepath.Ext(file.Filename))`\n- Save file: `c.SaveFile(file, savePath)`\n- Store accessible URL: `fmt.Sprintf(\"/uploads/snaps/%s\", filename)`\n- Validate file size max 10MB, validate content type (image/jpeg, image/png, image/heic)\n\nModify backend/cmd/server/main.go:\n- Add static file serving: `app.Static(\"/uploads\", \"./uploads\")`\n- Create uploads directory on startup: `os.MkdirAll(\"./uploads/snaps\", 0755)`\n\nModify mobile/app/(protected)/snap-create.tsx:\n- Change handlePost to use FormData instead of JSON:\n  ```\n  const formData = new FormData();\n  formData.append('image', { uri: imageUri, name: 'snap.jpg', type: 'image/jpeg' } as any);\n  formData.append('caption', caption);\n  formData.append('filter', selectedFilter);\n  await api.post('/snaps', formData, { headers: { 'Content-Type': 'multipart/form-data' } });\n  ```\n\nModify mobile/lib/api.ts:\n- Increase timeout to 30000 for upload support\n- Add request interceptor check: if Content-Type is multipart/form-data, don't override it",
-      "status": "in_progress",
+      "status": "completed",
       "priority": 10,
       "depends_on": [],
       "test_command": "cd backend \u0026\u0026 go build ./...",
       "auto_commit": true,
       "created_at": "",
-      "updated_at": "2026-02-15T05:56:57Z"
+      "updated_at": "2026-02-15T06:03:37Z"
     },
     {
       "id": "enhance_002",
       "title": "Add user profile endpoint with created_at field",
       "description": "The profile screen hardcodes 'Member since Feb 2026' at mobile/app/(protected)/profile.tsx line 90. The backend has no profile/me endpoint so the frontend cannot fetch the user's actual registration date.\n\nBackend changes:\n1. Add to backend/internal/dto/auth_dto.go a new ProfileResponse struct:\n   ```go\n   type ProfileResponse struct {\n     ID        string `json:\"id\"`\n     Email     string `json:\"email\"`\n     CreatedAt string `json:\"created_at\"`\n   }\n   ```\n\n2. Add to backend/internal/services/auth_service.go:\n   ```go\n   func (s *AuthService) GetProfile(userID uuid.UUID) (*dto.ProfileResponse, error) {\n     var user models.User\n     if err := s.db.Where(\"id = ?\", userID).First(\u0026user).Error; err != nil {\n       return nil, ErrUserNotFound\n     }\n     return \u0026dto.ProfileResponse{\n       ID: user.ID.String(), Email: user.Email,\n       CreatedAt: user.CreatedAt.Format(time.RFC3339),\n     }, nil\n   }\n   ```\n\n3. Add to backend/internal/handlers/auth_handler.go:\n   ```go\n   func (h *AuthHandler) GetProfile(c *fiber.Ctx) error {\n     userID, err := extractUserID(c)\n     // ... get profile from service, return JSON\n   }\n   ```\n\n4. Add route in backend/internal/routes/routes.go under protected auth group:\n   `auth.Get(\"/profile\", authHandler.GetProfile)`\n\nMobile changes in mobile/app/(protected)/profile.tsx:\n- Add state: `const [profile, setProfile] = useState\u003c{created_at: string} | null\u003e(null)`\n- Fetch from `/auth/profile` in useEffect alongside streak data\n- Replace hardcoded 'Member since Feb 2026' with:\n  `Member since ${new Date(profile.created_at).toLocaleDateString('en-US', { month: 'short', year: 'numeric' })}`",
-      "status": "pending",
+      "status": "in_progress",
       "priority": 9,
       "depends_on": [],
       "test_command": "cd backend \u0026\u0026 go build ./...",
       "auto_commit": true,
       "created_at": "",
-      "updated_at": ""
+      "updated_at": "2026-02-15T06:03:37Z"
     },
     {
       "id": "enhance_003",
