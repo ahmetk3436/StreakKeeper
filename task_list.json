@@ -40,25 +40,25 @@
       "id": "enhance_004",
       "title": "Add snap deletion from history with swipe gesture",
       "description": "The history screen at mobile/app/(protected)/history.tsx displays snaps but provides no way for users to delete them, even though the backend has DELETE /snaps/:id endpoint fully implemented. This is a missing feature.\n\nModify mobile/app/(protected)/history.tsx:\n1. Import Animated from 'react-native' and hapticWarning, hapticSuccess from '../../lib/haptics'\n2. Add delete handler:\n   ```typescript\n   const handleDeleteSnap = async (snapId: string) =\u003e {\n     hapticWarning();\n     Alert.alert(\n       'Delete Snap',\n       'Are you sure you want to delete this snap? This cannot be undone.',\n       [\n         { text: 'Cancel', style: 'cancel' },\n         {\n           text: 'Delete', style: 'destructive',\n           onPress: async () =\u003e {\n             try {\n               await api.delete(`/snaps/${snapId}`);\n               setSnaps(prev =\u003e prev.filter(s =\u003e s.id !== snapId));\n               setTotal(prev =\u003e prev - 1);\n               hapticSuccess();\n             } catch (error) {\n               Alert.alert('Error', 'Failed to delete snap');\n             }\n           },\n         },\n       ]\n     );\n   };\n   ```\n3. Add a delete button (trash icon) to each snap card in renderSnap, positioned at the top-right of the card:\n   ```tsx\n   \u003cPressable\n     onPress={() =\u003e handleDeleteSnap(item.id)}\n     className=\"absolute top-3 right-3 h-8 w-8 rounded-full bg-black/50 items-center justify-center\"\n   \u003e\n     \u003cIonicons name=\"trash-outline\" size={16} color=\"#ef4444\" /\u003e\n   \u003c/Pressable\u003e\n   ```\n4. Add share button to each snap card next to the like count, using shareSnap from '../../lib/share':\n   ```tsx\n   \u003cPressable onPress={() =\u003e shareSnap(item.caption)} className=\"flex-row items-center\"\u003e\n     \u003cIonicons name=\"share-outline\" size={14} color=\"#6b7280\" /\u003e\n     \u003cText className=\"text-sm text-gray-500 ml-1\"\u003eShare\u003c/Text\u003e\n   \u003c/Pressable\u003e\n   ```",
-      "status": "in_progress",
+      "status": "completed",
       "priority": 7,
       "depends_on": [],
       "test_command": "cd mobile \u0026\u0026 npx tsc --noEmit",
       "auto_commit": true,
       "created_at": "",
-      "updated_at": "2026-02-15T06:20:55Z"
+      "updated_at": "2026-02-15T06:25:03Z"
     },
     {
       "id": "enhance_005",
       "title": "Add streak freeze and recovery backend logic",
       "description": "The app has no streak protection mechanism. If a user misses one day, their entire streak resets to 1. This is frustrating for engaged users and increases churn. Add a streak freeze feature (premium-only) that allows users to protect their streak for 1 missed day.\n\nBackend changes:\n1. Add fields to backend/internal/models/snap.go SnapStreak model:\n   ```go\n   FreezesAvailable int  `json:\"freezes_available\" gorm:\"default:0\"`\n   FreezesUsed      int  `json:\"freezes_used\" gorm:\"default:0\"`\n   LastFreezeDate   time.Time `json:\"last_freeze_date\"`\n   ```\n\n2. Modify backend/internal/services/snap_service.go updateStreak method:\n   - In the 'streak broken' else branch (line 100-101), before resetting to 1:\n   - Check if streak.FreezesAvailable \u003e 0\n   - If yes: decrement FreezesAvailable, increment FreezesUsed, set LastFreezeDate=now, keep CurrentStreak unchanged (don't reset)\n   - If no: reset CurrentStreak to 1 (existing behavior)\n\n3. Add method to SnapService:\n   ```go\n   func (s *SnapService) AddStreakFreeze(userID uuid.UUID) error {\n     var streak models.SnapStreak\n     err := s.db.Where(\"user_id = ?\", userID).First(\u0026streak).Error\n     if errors.Is(err, gorm.ErrRecordNotFound) {\n       return errors.New(\"no streak record found\")\n     }\n     if streak.FreezesAvailable \u003e= 3 {\n       return errors.New(\"maximum freezes reached\")\n     }\n     streak.FreezesAvailable++\n     return s.db.Save(\u0026streak).Error\n   }\n   ```\n\n4. Add handler in backend/internal/handlers/snap_handler.go:\n   ```go\n   func (h *SnapHandler) AddFreeze(c *fiber.Ctx) error { ... }\n   ```\n\n5. Add route: `snaps.Post(\"/streak/freeze\", snapHandler.AddFreeze)`\n\n6. Update StreakResponse DTO in backend/internal/dto/snap_dto.go to include FreezesAvailable int and FreezesUsed int\n\n7. Update mobile/types/snap.ts SnapStreak interface to include freezes_available and freezes_used\n\n8. Update mobile/app/(protected)/home.tsx to show freeze count below streak card: a small pill showing '🛡️ {freezes} freezes' in blue if \u003e 0",
-      "status": "pending",
+      "status": "in_progress",
       "priority": 7,
       "depends_on": [],
       "test_command": "cd backend \u0026\u0026 go build ./...",
       "auto_commit": true,
       "created_at": "",
-      "updated_at": ""
+      "updated_at": "2026-02-15T06:25:03Z"
     },
     {
       "id": "enhance_006",

@@ -186,11 +186,47 @@ func (h *SnapHandler) GetStreak(c *fiber.Ctx) error {
 	}
 
 	return c.JSON(dto.StreakResponse{
-		CurrentStreak:   streak.CurrentStreak,
-		LongestStreak:   streak.LongestStreak,
-		TotalSnaps:      streak.TotalSnaps,
-		LastSnapDate:    streak.LastSnapDate,
-		HasSnappedToday: todaySnap != nil,
+		CurrentStreak:    streak.CurrentStreak,
+		LongestStreak:    streak.LongestStreak,
+		TotalSnaps:       streak.TotalSnaps,
+		LastSnapDate:     streak.LastSnapDate,
+		HasSnappedToday:  todaySnap != nil,
+		FreezesAvailable: streak.FreezesAvailable,
+		FreezesUsed:      streak.FreezesUsed,
+	})
+}
+
+// AddFreeze handles POST /snaps/streak/freeze — adds a streak freeze to the user's account.
+func (h *SnapHandler) AddFreeze(c *fiber.Ctx) error {
+	userID, err := extractUserID(c)
+	if err != nil {
+		return c.Status(fiber.StatusUnauthorized).JSON(dto.ErrorResponse{
+			Error: true, Message: "Unauthorized",
+		})
+	}
+
+	err = h.snapService.AddStreakFreeze(userID)
+	if err != nil {
+		if err.Error() == "maximum freezes reached (3)" {
+			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+				"error": "You already have the maximum of 3 freezes",
+			})
+		}
+		if err.Error() == "no streak record found for user" {
+			return c.Status(fiber.StatusNotFound).JSON(fiber.Map{
+				"error": "No streak record found. Start your streak first!",
+			})
+		}
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"error": "Failed to add streak freeze",
+		})
+	}
+
+	return c.Status(fiber.StatusOK).JSON(fiber.Map{
+		"message": "Streak freeze added successfully",
+		"data": fiber.Map{
+			"freezes_available": 1,
+		},
 	})
 }
 

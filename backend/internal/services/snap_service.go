@@ -97,8 +97,17 @@ func (s *SnapService) updateStreak(userID uuid.UUID) error {
 		// Consecutive day, increment streak
 		streak.CurrentStreak++
 	} else {
-		// Streak broken, reset to 1
-		streak.CurrentStreak = 1
+		// Streak broken - check for freeze availability
+		if streak.FreezesAvailable > 0 {
+			// Use a freeze to protect the streak
+			streak.FreezesAvailable--
+			streak.FreezesUsed++
+			streak.LastFreezeDate = time.Now()
+			// Keep CurrentStreak unchanged - the missed day is forgiven
+		} else {
+			// No freezes available - reset streak to 1
+			streak.CurrentStreak = 1
+		}
 	}
 
 	if streak.CurrentStreak > streak.LongestStreak {
@@ -185,4 +194,52 @@ func (s *SnapService) LikeSnap(snapID uuid.UUID) error {
 		return ErrSnapNotFound
 	}
 	return nil
+}
+
+// AddStreakFreeze adds one streak freeze to the user's available freezes.
+// Maximum of 3 freezes can be stored at once.
+func (s *SnapService) AddStreakFreeze(userID uuid.UUID) error {
+	var streak models.SnapStreak
+
+	err := s.db.Where("user_id = ?", userID).First(&streak).Error
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return errors.New("no streak record found for user")
+		}
+		return err
+	}
+
+	if streak.FreezesAvailable >= 3 {
+		return errors.New("maximum freezes reached (3)")
+	}
+
+	streak.FreezesAvailable++
+
+	return s.db.Save(&streak).Error
+}
+
+// GetStreakWithFreezes retrieves the streak data including freeze information.
+func (s *SnapService) GetStreakWithFreezes(userID uuid.UUID) (*models.SnapStreak, error) {
+	var streak models.SnapStreak
+
+	err := s.db.Where("user_id = ?", userID).First(&streak).Error
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			streak = models.SnapStreak{
+				UserID:           userID,
+				CurrentStreak:    0,
+				LongestStreak:    0,
+				FreezesAvailable: 0,
+				FreezesUsed:      0,
+			}
+			err = s.db.Create(&streak).Error
+			if err != nil {
+				return nil, err
+			}
+			return &streak, nil
+		}
+		return nil, err
+	}
+
+	return &streak, nil
 }

@@ -20,11 +20,20 @@ type SnapResponse struct {
 }
 
 type StreakResponse struct {
-	CurrentStreak  int       `json:"current_streak"`
-	LongestStreak  int       `json:"longest_streak"`
-	TotalSnaps     int       `json:"total_snaps"`
-	LastSnapDate   time.Time `json:"last_snap_date"`
-	HasSnappedToday bool     `json:"has_snapped_today"`
+	CurrentStreak   int       `json:"current_streak"`
+	LongestStreak   int       `json:"longest_streak"`
+	TotalSnaps      int       `json:"total_snaps"`
+	LastSnapDate    time.Time `json:"last_snap_date"`
+	HasSnappedToday bool      `json:"has_snapped_today"`
+	FreezesAvailable int      `json:"freezes_available"`
+	FreezesUsed      int      `json:"freezes_used"`
+}
+
+type FreezeResponse struct {
+	Message          string `json:"message"`
+	FreezesAvailable int    `json:"freezes_available"`
+	FreezesUsed      int    `json:"freezes_used"`
+	CurrentStreak    int    `json:"current_streak"`
 }
 
 type SnapsListResponse struct {

@@ -13,8 +13,9 @@ import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import * as ImagePicker from 'expo-image-picker';
 import { useAuth } from '../../contexts/AuthContext';
+import { useSubscription } from '../../contexts/SubscriptionContext';
 import api from '../../lib/api';
-import { hapticSuccess } from '../../lib/haptics';
+import { hapticSuccess, hapticError, hapticSelection } from '../../lib/haptics';
 import { shareSnap } from '../../lib/share';
 import Skeleton from '../../components/ui/Skeleton';
 import StreakCelebration, { isMilestone } from '../../components/StreakCelebration';
@@ -22,6 +23,7 @@ import type { SnapStreak, Snap } from '../../types/snap';
 
 export default function HomeScreen() {
   const { user, isGuest, guestUsageCount, canUseFeature, incrementGuestUsage } = useAuth();
+  const { isSubscribed } = useSubscription();
   const router = useRouter();
   const [streak, setStreak] = useState<SnapStreak | null>(null);
   const [todaySnap, setTodaySnap] = useState<Snap | null>(null);
@@ -98,6 +100,23 @@ export default function HomeScreen() {
         pathname: '/(protected)/snap-create',
         params: { imageUri: result.assets[0].uri },
       });
+    }
+  };
+
+  const handleAddFreeze = async () => {
+    if (!isSubscribed) {
+      router.push('/(protected)/paywall');
+      hapticSelection();
+      return;
+    }
+
+    try {
+      await api.post('/snaps/streak/freeze');
+      hapticSuccess();
+      fetchStreakData();
+    } catch (err: any) {
+      hapticError();
+      Alert.alert('Error', err.response?.data?.error || 'Failed to add freeze');
     }
   };
 
@@ -193,6 +212,28 @@ export default function HomeScreen() {
               <Text className="text-orange-200 text-xs">Total Snaps</Text>
             </View>
           </View>
+
+          {/* Freeze Protection Pill */}
+          {streak && streak.freezes_available > 0 && (
+            <View className="bg-white/20 rounded-full px-3 py-1.5 self-center mt-3 flex-row items-center">
+              <Text className="text-sm">{'\u{1F6E1}\uFE0F'}</Text>
+              <Text className="text-sm text-white font-medium ml-1">
+                {streak.freezes_available} freeze{streak.freezes_available !== 1 ? 's' : ''} available
+              </Text>
+            </View>
+          )}
+
+          {streak && streak.freezes_available === 0 && isSubscribed && (
+            <Pressable
+              onPress={handleAddFreeze}
+              className="bg-white/10 rounded-full px-3 py-1.5 self-center mt-3 flex-row items-center"
+            >
+              <Text className="text-sm">{'\u{1F6E1}\uFE0F'}</Text>
+              <Text className="text-sm text-white/70 font-medium ml-1">
+                Tap to add freeze
+              </Text>
+            </Pressable>
+          )}
         </View>
 
         {/* Streak Status Text */}
