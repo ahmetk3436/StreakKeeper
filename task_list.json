@@ -28,25 +28,25 @@
       "id": "enhance_003",
       "title": "Add daily reminder push notifications system",
       "description": "The settings screen at mobile/app/(protected)/settings.tsx has a Daily Reminder toggle (line 220) that only saves to AsyncStorage but never actually schedules push notifications. This is a fake feature.\n\nMobile changes:\n1. Create mobile/lib/notifications.ts:\n   ```typescript\n   import * as Notifications from 'expo-notifications';\n   \n   export async function requestNotificationPermission(): Promise\u003cboolean\u003e {\n     const { status: existing } = await Notifications.getPermissionsAsync();\n     if (existing === 'granted') return true;\n     const { status } = await Notifications.requestPermissionsAsync();\n     return status === 'granted';\n   }\n   \n   export async function scheduleDailyReminder(): Promise\u003cvoid\u003e {\n     await Notifications.cancelAllScheduledNotificationsAsync();\n     await Notifications.scheduleNotificationAsync({\n       content: {\n         title: \"Don't break your streak! 🔥\",\n         body: 'Take your daily snap to keep your streak alive!',\n         sound: 'default',\n       },\n       trigger: { hour: 18, minute: 0, repeats: true },\n     });\n   }\n   \n   export async function cancelDailyReminder(): Promise\u003cvoid\u003e {\n     await Notifications.cancelAllScheduledNotificationsAsync();\n   }\n   ```\n\n2. Modify mobile/app/(protected)/settings.tsx toggleDailyReminder function:\n   - Import { requestNotificationPermission, scheduleDailyReminder, cancelDailyReminder } from '../../lib/notifications'\n   - When toggling ON: call requestNotificationPermission(), if granted call scheduleDailyReminder(), else Alert and keep toggle off\n   - When toggling OFF: call cancelDailyReminder()\n   - Still persist to AsyncStorage for state restoration\n\n3. Configure notification handler in mobile/app/_layout.tsx:\n   ```typescript\n   import * as Notifications from 'expo-notifications';\n   Notifications.setNotificationHandler({\n     handleNotification: async () =\u003e ({\n       shouldShowAlert: true, shouldPlaySound: true, shouldSetBadge: false,\n     }),\n   });\n   ```\n\nexpo-notifications is already available via Expo SDK 54, no new install needed.",
-      "status": "in_progress",
+      "status": "completed",
       "priority": 8,
       "depends_on": [],
       "test_command": "cd mobile \u0026\u0026 npx tsc --noEmit",
       "auto_commit": true,
       "created_at": "",
-      "updated_at": "2026-02-15T06:08:36Z"
+      "updated_at": "2026-02-15T06:20:55Z"
     },
     {
       "id": "enhance_004",
       "title": "Add snap deletion from history with swipe gesture",
       "description": "The history screen at mobile/app/(protected)/history.tsx displays snaps but provides no way for users to delete them, even though the backend has DELETE /snaps/:id endpoint fully implemented. This is a missing feature.\n\nModify mobile/app/(protected)/history.tsx:\n1. Import Animated from 'react-native' and hapticWarning, hapticSuccess from '../../lib/haptics'\n2. Add delete handler:\n   ```typescript\n   const handleDeleteSnap = async (snapId: string) =\u003e {\n     hapticWarning();\n     Alert.alert(\n       'Delete Snap',\n       'Are you sure you want to delete this snap? This cannot be undone.',\n       [\n         { text: 'Cancel', style: 'cancel' },\n         {\n           text: 'Delete', style: 'destructive',\n           onPress: async () =\u003e {\n             try {\n               await api.delete(`/snaps/${snapId}`);\n               setSnaps(prev =\u003e prev.filter(s =\u003e s.id !== snapId));\n               setTotal(prev =\u003e prev - 1);\n               hapticSuccess();\n             } catch (error) {\n               Alert.alert('Error', 'Failed to delete snap');\n             }\n           },\n         },\n       ]\n     );\n   };\n   ```\n3. Add a delete button (trash icon) to each snap card in renderSnap, positioned at the top-right of the card:\n   ```tsx\n   \u003cPressable\n     onPress={() =\u003e handleDeleteSnap(item.id)}\n     className=\"absolute top-3 right-3 h-8 w-8 rounded-full bg-black/50 items-center justify-center\"\n   \u003e\n     \u003cIonicons name=\"trash-outline\" size={16} color=\"#ef4444\" /\u003e\n   \u003c/Pressable\u003e\n   ```\n4. Add share button to each snap card next to the like count, using shareSnap from '../../lib/share':\n   ```tsx\n   \u003cPressable onPress={() =\u003e shareSnap(item.caption)} className=\"flex-row items-center\"\u003e\n     \u003cIonicons name=\"share-outline\" size={14} color=\"#6b7280\" /\u003e\n     \u003cText className=\"text-sm text-gray-500 ml-1\"\u003eShare\u003c/Text\u003e\n   \u003c/Pressable\u003e\n   ```",
-      "status": "pending",
+      "status": "in_progress",
       "priority": 7,
       "depends_on": [],
       "test_command": "cd mobile \u0026\u0026 npx tsc --noEmit",
       "auto_commit": true,
       "created_at": "",
-      "updated_at": ""
+      "updated_at": "2026-02-15T06:20:55Z"
     },
     {
       "id": "enhance_005",

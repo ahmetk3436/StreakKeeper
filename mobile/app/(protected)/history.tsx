@@ -2,15 +2,19 @@ import React, { useState, useEffect, useCallback } from 'react';
 import {
   View,
   Text,
+  Pressable,
   FlatList,
   Image,
   RefreshControl,
   ActivityIndicator,
+  Alert,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import api from '../../lib/api';
 import { useAuth } from '../../contexts/AuthContext';
+import { hapticSuccess, hapticWarning, hapticError, hapticSelection } from '../../lib/haptics';
+import { shareSnap } from '../../lib/share';
 import Skeleton from '../../components/ui/Skeleton';
 import type { Snap, SnapsListResponse } from '../../types/snap';
 
@@ -31,6 +35,7 @@ export default function HistoryScreen() {
   const [isLoading, setIsLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
+  const [deleting, setDeleting] = useState<string | null>(null);
 
   const fetchSnaps = useCallback(
     async (pageNum: number, replace: boolean = false) => {
@@ -76,17 +81,75 @@ export default function HistoryScreen() {
     }
   }, [snaps.length, total, loadingMore, page, fetchSnaps]);
 
-  const renderSnap = ({ item }: { item: Snap }) => (
+  const handleDeleteSnap = async (snapId: string) => {
+    hapticWarning();
+
+    Alert.alert(
+      'Delete Snap',
+      'Are you sure you want to delete this snap? This cannot be undone.',
+      [
+        {
+          text: 'Cancel',
+          style: 'cancel',
+          onPress: () => hapticSelection(),
+        },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: async () => {
+            setDeleting(snapId);
+            try {
+              await api.delete(`/snaps/${snapId}`);
+              setSnaps(prev => prev.filter(s => s.id !== snapId));
+              setTotal(prev => Math.max(0, prev - 1));
+              hapticSuccess();
+            } catch (error) {
+              hapticError();
+              Alert.alert('Error', 'Failed to delete snap. Please try again.');
+            } finally {
+              setDeleting(null);
+            }
+          },
+        },
+      ]
+    );
+  };
+
+  const handleShareSnap = async (caption: string) => {
+    hapticSelection();
+    try {
+      await shareSnap(caption);
+      hapticSuccess();
+    } catch (error) {
+      hapticError();
+    }
+  };
+
+  const renderSnap = ({ item }: { item: Snap }) => {
+    const isBeingDeleted = deleting === item.id;
+
+    return (
     <View
-      className="mx-6 mb-4 rounded-2xl bg-gray-900 overflow-hidden"
+      className="mx-6 mb-4 rounded-2xl bg-gray-900 overflow-hidden relative"
       style={{
         shadowColor: '#000',
         shadowOffset: { width: 0, height: 2 },
         shadowOpacity: 0.08,
         shadowRadius: 12,
         elevation: 3,
+        opacity: isBeingDeleted ? 0.5 : 1,
       }}
     >
+      {/* Delete Button - Top Right */}
+      <Pressable
+        onPress={() => handleDeleteSnap(item.id)}
+        disabled={isBeingDeleted}
+        className="absolute top-3 right-3 h-8 w-8 rounded-full bg-black/50 items-center justify-center z-10"
+        style={{ opacity: isBeingDeleted ? 0.3 : 1 }}
+      >
+        <Ionicons name="trash-outline" size={16} color="#ef4444" />
+      </Pressable>
+
       {item.image_url ? (
         <Image
           source={{ uri: item.image_url }}
@@ -104,7 +167,7 @@ export default function HistoryScreen() {
       )}
       <View className="p-4">
         {item.caption ? (
-          <Text className="text-base text-white font-medium mb-2">
+          <Text className="text-base text-white font-medium mb-2 pr-10">
             {item.caption}
           </Text>
         ) : null}
@@ -120,17 +183,28 @@ export default function HistoryScreen() {
               {formatDate(item.snap_date)}
             </Text>
           </View>
-          {item.filter && item.filter !== 'none' && (
-            <View className="rounded-full bg-orange-500/20 px-2 py-0.5">
-              <Text className="text-xs text-orange-400 capitalize">
-                {item.filter}
-              </Text>
-            </View>
-          )}
+          <View className="flex-row items-center gap-3">
+            {item.filter && item.filter !== 'none' && (
+              <View className="rounded-full bg-orange-500/20 px-2 py-0.5">
+                <Text className="text-xs text-orange-400 capitalize">
+                  {item.filter}
+                </Text>
+              </View>
+            )}
+            {/* Share Button */}
+            <Pressable
+              onPress={() => handleShareSnap(item.caption)}
+              className="flex-row items-center"
+            >
+              <Ionicons name="share-outline" size={14} color="#6b7280" />
+              <Text className="text-sm text-gray-500 ml-1">Share</Text>
+            </Pressable>
+          </View>
         </View>
       </View>
     </View>
-  );
+    );
+  };
 
   const renderEmpty = () => {
     if (isLoading) return null;
