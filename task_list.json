@@ -52,25 +52,25 @@
       "id": "enhance_005",
       "title": "Add streak freeze and recovery backend logic",
       "description": "The app has no streak protection mechanism. If a user misses one day, their entire streak resets to 1. This is frustrating for engaged users and increases churn. Add a streak freeze feature (premium-only) that allows users to protect their streak for 1 missed day.\n\nBackend changes:\n1. Add fields to backend/internal/models/snap.go SnapStreak model:\n   ```go\n   FreezesAvailable int  `json:\"freezes_available\" gorm:\"default:0\"`\n   FreezesUsed      int  `json:\"freezes_used\" gorm:\"default:0\"`\n   LastFreezeDate   time.Time `json:\"last_freeze_date\"`\n   ```\n\n2. Modify backend/internal/services/snap_service.go updateStreak method:\n   - In the 'streak broken' else branch (line 100-101), before resetting to 1:\n   - Check if streak.FreezesAvailable \u003e 0\n   - If yes: decrement FreezesAvailable, increment FreezesUsed, set LastFreezeDate=now, keep CurrentStreak unchanged (don't reset)\n   - If no: reset CurrentStreak to 1 (existing behavior)\n\n3. Add method to SnapService:\n   ```go\n   func (s *SnapService) AddStreakFreeze(userID uuid.UUID) error {\n     var streak models.SnapStreak\n     err := s.db.Where(\"user_id = ?\", userID).First(\u0026streak).Error\n     if errors.Is(err, gorm.ErrRecordNotFound) {\n       return errors.New(\"no streak record found\")\n     }\n     if streak.FreezesAvailable \u003e= 3 {\n       return errors.New(\"maximum freezes reached\")\n     }\n     streak.FreezesAvailable++\n     return s.db.Save(\u0026streak).Error\n   }\n   ```\n\n4. Add handler in backend/internal/handlers/snap_handler.go:\n   ```go\n   func (h *SnapHandler) AddFreeze(c *fiber.Ctx) error { ... }\n   ```\n\n5. Add route: `snaps.Post(\"/streak/freeze\", snapHandler.AddFreeze)`\n\n6. Update StreakResponse DTO in backend/internal/dto/snap_dto.go to include FreezesAvailable int and FreezesUsed int\n\n7. Update mobile/types/snap.ts SnapStreak interface to include freezes_available and freezes_used\n\n8. Update mobile/app/(protected)/home.tsx to show freeze count below streak card: a small pill showing '🛡️ {freezes} freezes' in blue if \u003e 0",
-      "status": "in_progress",
+      "status": "completed",
       "priority": 7,
       "depends_on": [],
       "test_command": "cd backend \u0026\u0026 go build ./...",
       "auto_commit": true,
       "created_at": "",
-      "updated_at": "2026-02-15T06:25:03Z"
+      "updated_at": "2026-02-15T06:34:24Z"
     },
     {
       "id": "enhance_006",
       "title": "Enhance onboarding with animated transitions and gradient backgrounds",
       "description": "The onboarding at mobile/app/(onboarding)/index.tsx is functional but visually plain — just icons on a dark background. For App Store quality, it needs gradient backgrounds, animated transitions, and more engaging copy.\n\nModify mobile/app/(onboarding)/index.tsx:\n1. Import LinearGradient from 'expo-linear-gradient' and Animated from 'react-native'\n2. Replace the plain bg-gray-950 with per-page gradient backgrounds:\n   - Page 1: LinearGradient colors={['#1a0a00', '#030712']} (warm dark)\n   - Page 2: LinearGradient colors={['#0a0a1a', '#030712']} (cool dark)\n   - Page 3: LinearGradient colors={['#1a0800', '#030712']} (orange hint)\n3. Increase icon sizes from 80 to 96\n4. Add animated icon entrance: use Animated.Value for scale, start at 0.5, spring to 1.0 when page becomes active\n5. Update PAGES content for better engagement:\n   - Page 1: title 'Your Daily Streak' subtitle 'One photo a day keeps the streak alive'\n   - Page 2: title 'Build Habits That Stick' with features: 'Track your daily photo streak', 'Celebrate milestones \u0026 achievements', 'Share your progress with friends'\n   - Page 3: title 'Start Your Journey' subtitle 'Join thousands building daily habits'\n6. Change CTA buttons on page 3:\n   - Primary button: variant='gradient' title='Try Free — 3 Snaps'\n   - Secondary button: variant='outline' title='I Have an Account'\n7. Add subtitle text under page dots: `\u003cText className=\"text-xs text-gray-600 pb-4\"\u003eSwipe to explore\u003c/Text\u003e` (only on page 0 and 1)\n8. Enlarge dot indicators: h-2.5 w-2.5 for active, h-2 w-2 for inactive, with smooth width transition on active dot (w-6 elongated pill shape)",
-      "status": "pending",
+      "status": "in_progress",
       "priority": 6,
       "depends_on": [],
       "test_command": "cd mobile \u0026\u0026 npx tsc --noEmit",
       "auto_commit": true,
       "created_at": "",
-      "updated_at": ""
+      "updated_at": "2026-02-15T06:34:24Z"
     },
     {
       "id": "enhance_007",
