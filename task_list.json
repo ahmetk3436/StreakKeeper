@@ -88,25 +88,25 @@
       "id": "enhance_008",
       "title": "Add real image filters with opacity overlays on snap-create",
       "description": "The filter selector at mobile/app/(protected)/snap-create.tsx shows colored circles but the filters have NO visual effect on the image preview. The selected filter is just a string sent to the backend. Users expect to see the filter applied to the image before posting.\n\nModify mobile/app/(protected)/snap-create.tsx:\n1. Define filter overlay styles with semi-transparent color overlays:\n   ```typescript\n   const FILTER_OVERLAYS: Record\u003cstring, { color: string; opacity: number; blendMode?: string }\u003e = {\n     none: { color: 'transparent', opacity: 0 },\n     vintage: { color: '#d97706', opacity: 0.2 },\n     warm: { color: '#ea580c', opacity: 0.15 },\n     cool: { color: '#3b82f6', opacity: 0.2 },\n     dramatic: { color: '#000000', opacity: 0.35 },\n     minimal: { color: '#ffffff', opacity: 0.1 },\n     vibrant: { color: '#9333ea', opacity: 0.15 },\n     noir: { color: '#000000', opacity: 0.5 },\n   };\n   ```\n\n2. Wrap the Image component in a View with overflow hidden, and add an absolute-positioned overlay View on top:\n   ```tsx\n   \u003cView className=\"mx-6 mt-4 rounded-2xl overflow-hidden\" style={{ height: 350 }}\u003e\n     \u003cImage source={{ uri: imageUri }} className=\"w-full h-full\" resizeMode=\"cover\" /\u003e\n     {selectedFilter !== 'none' \u0026\u0026 (\n       \u003cView\n         className=\"absolute inset-0\"\n         style={{\n           backgroundColor: FILTER_OVERLAYS[selectedFilter].color,\n           opacity: FILTER_OVERLAYS[selectedFilter].opacity,\n         }}\n       /\u003e\n     )}\n   \u003c/View\u003e\n   ```\n\n3. Add filter name label below image: \n   ```tsx\n   {selectedFilter !== 'none' \u0026\u0026 (\n     \u003cText className=\"text-center text-sm text-orange-400 mt-2 capitalize\"\u003e\n       {selectedFilter} filter applied\n     \u003c/Text\u003e\n   )}\n   ```\n\n4. Add mini preview thumbnails in filter selector: each filter circle should show a tiny 48x48 version of the image with the overlay applied, instead of just a solid color circle. Use the Image component at 48x48 with the overlay on top.",
+      "status": "completed",
+      "priority": 6,
+      "depends_on": [],
+      "test_command": "cd mobile \u0026\u0026 npx tsc --noEmit",
+      "auto_commit": true,
+      "created_at": "",
+      "updated_at": "2026-02-15T06:53:30Z"
+    },
+    {
+      "id": "enhance_009",
+      "title": "Add streak sharing with shareable result card",
+      "description": "The app has a ShareableResult component at mobile/components/ui/ShareableResult.tsx and share utilities at mobile/lib/share.ts, but the home screen only has a basic text share on today's snap. Users should be able to share a beautiful branded streak card for milestone celebrations and from the profile screen.\n\nModify mobile/components/StreakCelebration.tsx:\n1. Import ShareableResult from '../components/ui/ShareableResult'\n2. Import { shareStreak } from '../lib/share'\n3. Replace the 'Share Achievement' button's onPress to call shareStreak(streakCount)\n4. Add a ShareableResult component inside the modal that's visible before sharing:\n   ```tsx\n   \u003cShareableResult\n     title=\"Streak Milestone!\"\n     resultText={`${streakCount} Day Streak`}\n     icon=\"flame\"\n     colors={['#f97316', '#ea580c', '#dc2626']}\n   /\u003e\n   ```\n\nModify mobile/app/(protected)/profile.tsx:\n1. Import { shareStreak } from '../../lib/share' and { hapticMedium } from '../../lib/haptics'\n2. Add a 'Share My Stats' button below the achievements section:\n   ```tsx\n   \u003cPressable\n     onPress={() =\u003e { hapticMedium(); shareStreak(streak?.current_streak || 0); }}\n     className=\"mx-6 mt-6 mb-4 flex-row items-center justify-center p-4 rounded-2xl bg-orange-500/10 border border-orange-500/20\"\n   \u003e\n     \u003cIonicons name=\"share-social-outline\" size={20} color=\"#f97316\" /\u003e\n     \u003cText className=\"text-base font-semibold text-orange-500 ml-2\"\u003eShare My Streak\u003c/Text\u003e\n   \u003c/Pressable\u003e\n   ```\n\nModify mobile/lib/share.ts:\n- Enhance shareStreak message to include more engaging copy:\n  ```typescript\n  export const shareStreak = async (count: number) =\u003e {\n    const messages = [\n      `I'm on a ${count}-day streak on Snapstreak! Can you beat me?`,\n      `${count} days and counting! My Snapstreak game is strong 🔥`,\n      `Day ${count} of my photo streak! Join me on Snapstreak!`,\n    ];\n    const message = messages[count % messages.length];\n    await Share.share({ message });\n  };\n  ```",
       "status": "in_progress",
       "priority": 6,
       "depends_on": [],
       "test_command": "cd mobile \u0026\u0026 npx tsc --noEmit",
       "auto_commit": true,
       "created_at": "",
-      "updated_at": "2026-02-15T06:48:12Z"
-    },
-    {
-      "id": "enhance_009",
-      "title": "Add streak sharing with shareable result card",
-      "description": "The app has a ShareableResult component at mobile/components/ui/ShareableResult.tsx and share utilities at mobile/lib/share.ts, but the home screen only has a basic text share on today's snap. Users should be able to share a beautiful branded streak card for milestone celebrations and from the profile screen.\n\nModify mobile/components/StreakCelebration.tsx:\n1. Import ShareableResult from '../components/ui/ShareableResult'\n2. Import { shareStreak } from '../lib/share'\n3. Replace the 'Share Achievement' button's onPress to call shareStreak(streakCount)\n4. Add a ShareableResult component inside the modal that's visible before sharing:\n   ```tsx\n   \u003cShareableResult\n     title=\"Streak Milestone!\"\n     resultText={`${streakCount} Day Streak`}\n     icon=\"flame\"\n     colors={['#f97316', '#ea580c', '#dc2626']}\n   /\u003e\n   ```\n\nModify mobile/app/(protected)/profile.tsx:\n1. Import { shareStreak } from '../../lib/share' and { hapticMedium } from '../../lib/haptics'\n2. Add a 'Share My Stats' button below the achievements section:\n   ```tsx\n   \u003cPressable\n     onPress={() =\u003e { hapticMedium(); shareStreak(streak?.current_streak || 0); }}\n     className=\"mx-6 mt-6 mb-4 flex-row items-center justify-center p-4 rounded-2xl bg-orange-500/10 border border-orange-500/20\"\n   \u003e\n     \u003cIonicons name=\"share-social-outline\" size={20} color=\"#f97316\" /\u003e\n     \u003cText className=\"text-base font-semibold text-orange-500 ml-2\"\u003eShare My Streak\u003c/Text\u003e\n   \u003c/Pressable\u003e\n   ```\n\nModify mobile/lib/share.ts:\n- Enhance shareStreak message to include more engaging copy:\n  ```typescript\n  export const shareStreak = async (count: number) =\u003e {\n    const messages = [\n      `I'm on a ${count}-day streak on Snapstreak! Can you beat me?`,\n      `${count} days and counting! My Snapstreak game is strong 🔥`,\n      `Day ${count} of my photo streak! Join me on Snapstreak!`,\n    ];\n    const message = messages[count % messages.length];\n    await Share.share({ message });\n  };\n  ```",
-      "status": "pending",
-      "priority": 6,
-      "depends_on": [],
-      "test_command": "cd mobile \u0026\u0026 npx tsc --noEmit",
-      "auto_commit": true,
-      "created_at": "",
-      "updated_at": ""
+      "updated_at": "2026-02-15T06:53:30Z"
     },
     {
       "id": "enhance_010",

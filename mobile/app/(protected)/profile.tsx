@@ -7,6 +7,8 @@ import { useAuth } from '../../contexts/AuthContext';
 import api from '../../lib/api';
 import * as Haptics from 'expo-haptics';
 import Skeleton from '../../components/ui/Skeleton';
+import { shareStreak } from '../../lib/share';
+import { hapticMedium } from '../../lib/haptics';
 import type { SnapStreak } from '../../types/snap';
 
 interface Achievement {
@@ -395,6 +397,15 @@ export default function ProfileScreen() {
             );
           })}
         </View>
+
+        {/* Share Button */}
+        <Pressable
+          onPress={() => { hapticMedium(); shareStreak(streak?.current_streak || 0); }}
+          className="mx-6 mt-6 mb-4 flex-row items-center justify-center p-4 rounded-2xl bg-orange-500/10 border border-orange-500/20"
+        >
+          <Ionicons name="share-social-outline" size={20} color="#f97316" />
+          <Text className="text-base font-semibold text-orange-500 ml-2">Share My Streak</Text>
+        </Pressable>
 
         {/* Quick Links */}
         <View className="mx-6 mt-8 mb-8">
