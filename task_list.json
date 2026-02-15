@@ -148,13 +148,13 @@
       "id": "enhance_013",
       "title": "Update legal pages with correct app name and privacy URL routing",
       "description": "The legal handler at backend/internal/handlers/legal_handler.go uses hardcoded HTML with the app name 'Snapstreak'. The settings screen links to external URLs (snapstreak.app/privacy and snapstreak.app/terms) that don't exist. The backend already serves legal pages at /api/legal/privacy and /api/legal/terms — the mobile app should use these.\n\nModify mobile/app/(protected)/settings.tsx:\n1. Change the Privacy Policy onPress (line 268) from:\n   `Linking.openURL('https://snapstreak.app/privacy')`\n   to use the API URL:\n   ```typescript\n   const API_BASE = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:8080/api';\n   Linking.openURL(`${API_BASE.replace('/api', '')}/api/legal/privacy`);\n   ```\n\n2. Change the Terms of Service onPress (line 275) similarly:\n   ```typescript\n   Linking.openURL(`${API_BASE.replace('/api', '')}/api/legal/terms`);\n   ```\n\nModify backend/internal/handlers/legal_handler.go:\n1. Update the app name references from 'Snapstreak' to 'StreakSnap' throughout both HTML templates\n2. Update the last updated date from 'February 7, 2026' to 'February 14, 2026'\n3. Add viewport meta tag for mobile rendering: `\u003cmeta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\"\u003e`\n4. Add dark background styling to match the app theme: `body { background-color: #030712; color: #e5e7eb; font-family: -apple-system, sans-serif; padding: 20px; max-width: 600px; margin: 0 auto; }` and links in orange: `a { color: #f97316; }`\n5. Ensure both legal pages mention the correct contact email and include RevenueCat subscription terms in the Terms of Service page",
-      "status": "in_progress",
+      "status": "completed",
       "priority": 5,
       "depends_on": [],
       "test_command": "cd backend \u0026\u0026 go build ./...",
       "auto_commit": true,
       "created_at": "",
-      "updated_at": "2026-02-15T07:31:26Z"
+      "updated_at": "2026-02-15T07:45:20Z"
     }
   ]
 }
