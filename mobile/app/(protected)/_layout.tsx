@@ -60,31 +60,62 @@ export default function ProtectedLayout() {
     TABS.find((t) => pathname.includes(t.name))?.name || 'home';
   const isHiddenScreen = HIDDEN_SCREENS.some((s) => pathname.includes(s));
 
-  const handleSnapPress = async () => {
+  const handleSnapPress = () => {
     hapticSelection();
-
-    const { status } = await ImagePicker.requestCameraPermissionsAsync();
-    if (status !== 'granted') {
-      Alert.alert(
-        'Permission Required',
-        'Camera access is needed to take snaps.'
-      );
-      return;
-    }
-
-    const result = await ImagePicker.launchCameraAsync({
-      mediaTypes: ['images'],
-      allowsEditing: true,
-      aspect: [1, 1],
-      quality: 0.8,
-    });
-
-    if (!result.canceled && result.assets[0]) {
-      router.push({
-        pathname: '/(protected)/snap-create',
-        params: { imageUri: result.assets[0].uri },
-      });
-    }
+    Alert.alert(
+      'New Snap',
+      'Choose how to add your daily snap',
+      [
+        {
+          text: 'Take Photo',
+          onPress: async () => {
+            const { status } = await ImagePicker.requestCameraPermissionsAsync();
+            if (status !== 'granted') {
+              Alert.alert('Permission Required', 'Camera access is needed to take photos.');
+              return;
+            }
+            const result = await ImagePicker.launchCameraAsync({
+              mediaTypes: ['images'],
+              allowsEditing: true,
+              aspect: [1, 1],
+              quality: 0.8,
+            });
+            if (!result.canceled && result.assets[0]) {
+              router.push({
+                pathname: '/(protected)/snap-create',
+                params: { imageUri: result.assets[0].uri },
+              });
+            }
+          },
+        },
+        {
+          text: 'Choose from Gallery',
+          onPress: async () => {
+            const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+            if (status !== 'granted') {
+              Alert.alert('Permission Required', 'Photo library access is needed to select photos.');
+              return;
+            }
+            const result = await ImagePicker.launchImageLibraryAsync({
+              mediaTypes: ['images'],
+              allowsEditing: true,
+              aspect: [1, 1],
+              quality: 0.8,
+            });
+            if (!result.canceled && result.assets[0]) {
+              router.push({
+                pathname: '/(protected)/snap-create',
+                params: { imageUri: result.assets[0].uri },
+              });
+            }
+          },
+        },
+        {
+          text: 'Cancel',
+          style: 'cancel' as const,
+        },
+      ]
+    );
   };
 
   return (

@@ -112,25 +112,25 @@
       "id": "enhance_010",
       "title": "Add animated streak counter and gradient header to home",
       "description": "The home screen at mobile/app/(protected)/home.tsx has a static streak card with bg-orange-600. Enhance it with an animated counter, LinearGradient background, and pulsing flame animation for a more premium feel.\n\nModify mobile/app/(protected)/home.tsx:\n1. Import LinearGradient from 'expo-linear-gradient'\n2. Import { useRef, useEffect } from 'react' and Animated, Easing from 'react-native'\n\n3. Add animated streak counter that counts up from 0 to current value on mount:\n   ```typescript\n   const countAnim = useRef(new Animated.Value(0)).current;\n   const [displayCount, setDisplayCount] = useState(0);\n   useEffect(() =\u003e {\n     if (streak?.current_streak) {\n       Animated.timing(countAnim, {\n         toValue: streak.current_streak,\n         duration: 1000,\n         easing: Easing.out(Easing.cubic),\n         useNativeDriver: false,\n       }).start();\n       countAnim.addListener(({ value }) =\u003e setDisplayCount(Math.round(value)));\n       return () =\u003e countAnim.removeAllListeners();\n     }\n   }, [streak?.current_streak]);\n   ```\n\n4. Replace the streak card View (bg-orange-600) with LinearGradient:\n   ```tsx\n   \u003cLinearGradient\n     colors={['#f97316', '#ea580c', '#dc2626']}\n     start={{ x: 0, y: 0 }}\n     end={{ x: 1, y: 1 }}\n     className=\"mx-6 mt-4 rounded-2xl p-6\"\n     style={{ shadowColor: '#f97316', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.4, shadowRadius: 16, elevation: 8 }}\n   \u003e\n   ```\n\n5. Use displayCount instead of streak?.current_streak in the 5xl text\n\n6. Add a pulsing flame icon animation in the header (right side):\n   ```typescript\n   const pulseAnim = useRef(new Animated.Value(1)).current;\n   useEffect(() =\u003e {\n     Animated.loop(\n       Animated.sequence([\n         Animated.timing(pulseAnim, { toValue: 1.2, duration: 800, useNativeDriver: true }),\n         Animated.timing(pulseAnim, { toValue: 1.0, duration: 800, useNativeDriver: true }),\n       ])\n     ).start();\n   }, []);\n   ```\n   Wrap the flame Ionicons in Animated.View with transform: [{ scale: pulseAnim }]\n\n7. Add motivational text that changes based on streak count:\n   - 0: 'Start your journey today!'\n   - 1-6: 'Great start! Keep it going!'\n   - 7-13: 'One week strong! 💪'\n   - 14-29: 'You're on fire! 🔥'\n   - 30+: 'Unstoppable! You're a legend! 🏆'",
-      "status": "in_progress",
+      "status": "completed",
       "priority": 6,
       "depends_on": [],
       "test_command": "cd mobile \u0026\u0026 npx tsc --noEmit",
       "auto_commit": true,
       "created_at": "",
-      "updated_at": "2026-02-15T07:02:16Z"
+      "updated_at": "2026-02-15T07:10:39Z"
     },
     {
       "id": "enhance_011",
       "title": "Add gallery picker option alongside camera for snap creation",
       "description": "Currently users can ONLY take photos with the camera to create snaps (via ImagePicker.launchCameraAsync). Many users want to post existing photos from their gallery. Add a gallery option.\n\nModify mobile/app/(protected)/_layout.tsx handleSnapPress function:\n- Replace the direct camera launch with an ActionSheet that offers two options:\n  ```typescript\n  const handleSnapPress = () =\u003e {\n    hapticSelection();\n    Alert.alert(\n      'New Snap',\n      'Choose how to add your daily snap',\n      [\n        {\n          text: 'Take Photo',\n          onPress: async () =\u003e {\n            const { status } = await ImagePicker.requestCameraPermissionsAsync();\n            if (status !== 'granted') {\n              Alert.alert('Permission Required', 'Camera access is needed.');\n              return;\n            }\n            const result = await ImagePicker.launchCameraAsync({\n              mediaTypes: ['images'], allowsEditing: true, aspect: [1, 1], quality: 0.8,\n            });\n            if (!result.canceled \u0026\u0026 result.assets[0]) {\n              router.push({ pathname: '/(protected)/snap-create', params: { imageUri: result.assets[0].uri } });\n            }\n          },\n        },\n        {\n          text: 'Choose from Gallery',\n          onPress: async () =\u003e {\n            const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();\n            if (status !== 'granted') {\n              Alert.alert('Permission Required', 'Photo library access is needed.');\n              return;\n            }\n            const result = await ImagePicker.launchImageLibraryAsync({\n              mediaTypes: ['images'], allowsEditing: true, aspect: [1, 1], quality: 0.8,\n            });\n            if (!result.canceled \u0026\u0026 result.assets[0]) {\n              router.push({ pathname: '/(protected)/snap-create', params: { imageUri: result.assets[0].uri } });\n            }\n          },\n        },\n        { text: 'Cancel', style: 'cancel' },\n      ]\n    );\n  };\n  ```\n\nDo the same change in mobile/app/(protected)/home.tsx handleCameraPress function — replace the direct camera launch with the same ActionSheet pattern (keep the guest check at the top).",
-      "status": "pending",
+      "status": "in_progress",
       "priority": 5,
       "depends_on": [],
       "test_command": "cd mobile \u0026\u0026 npx tsc --noEmit",
       "auto_commit": true,
       "created_at": "",
-      "updated_at": ""
+      "updated_at": "2026-02-15T07:10:39Z"
     },
     {
       "id": "enhance_012",
