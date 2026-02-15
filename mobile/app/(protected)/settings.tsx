@@ -293,17 +293,19 @@ export default function SettingsScreen() {
           </View>
           <Pressable
             className="p-4 border-b border-gray-800"
-            onPress={() =>
-              Linking.openURL('https://snapstreak.app/privacy')
-            }
+            onPress={() => {
+              const API_BASE = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:8080/api';
+              Linking.openURL(`${API_BASE.replace('/api', '')}/api/legal/privacy`);
+            }}
           >
             <Text className="text-base text-white">Privacy Policy</Text>
           </Pressable>
           <Pressable
             className="p-4"
-            onPress={() =>
-              Linking.openURL('https://snapstreak.app/terms')
-            }
+            onPress={() => {
+              const API_BASE = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:8080/api';
+              Linking.openURL(`${API_BASE.replace('/api', '')}/api/legal/terms`);
+            }}
           >
             <Text className="text-base text-white">Terms of Service</Text>
           </Pressable>

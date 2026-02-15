@@ -136,25 +136,25 @@
       "id": "enhance_012",
       "title": "Add proper error boundaries and network error handling",
       "description": "The app has no error boundary component. If any screen throws a render error, the entire app crashes. Also, network errors show raw technical messages to users.\n\nCreate mobile/components/ErrorBoundary.tsx:\n```typescript\nimport React from 'react';\nimport { View, Text, Pressable } from 'react-native';\nimport { Ionicons } from '@expo/vector-icons';\n\ninterface Props { children: React.ReactNode; }\ninterface State { hasError: boolean; error: Error | null; }\n\nexport default class ErrorBoundary extends React.Component\u003cProps, State\u003e {\n  state: State = { hasError: false, error: null };\n  static getDerivedStateFromError(error: Error) { return { hasError: true, error }; }\n  render() {\n    if (this.state.hasError) {\n      return (\n        \u003cView className=\"flex-1 bg-gray-950 items-center justify-center px-8\"\u003e\n          \u003cIonicons name=\"warning-outline\" size={64} color=\"#f97316\" /\u003e\n          \u003cText className=\"text-xl font-bold text-white mt-4\"\u003eSomething went wrong\u003c/Text\u003e\n          \u003cText className=\"text-sm text-gray-400 mt-2 text-center\"\u003eWe're sorry for the inconvenience. Please try again.\u003c/Text\u003e\n          \u003cPressable\n            onPress={() =\u003e this.setState({ hasError: false, error: null })}\n            className=\"mt-6 rounded-xl bg-orange-500 px-6 py-3\"\n          \u003e\n            \u003cText className=\"text-base font-semibold text-white\"\u003eTry Again\u003c/Text\u003e\n          \u003c/Pressable\u003e\n        \u003c/View\u003e\n      );\n    }\n    return this.props.children;\n  }\n}\n```\n\nModify mobile/app/_layout.tsx:\n- Import ErrorBoundary from '../components/ErrorBoundary'\n- Wrap children: `\u003cErrorBoundary\u003e\u003cAuthProvider\u003e\u003cSubscriptionProvider\u003e...\u003c/SubscriptionProvider\u003e\u003c/AuthProvider\u003e\u003c/ErrorBoundary\u003e`\n\nModify mobile/lib/api.ts:\n- Add response interceptor for network errors that provides user-friendly messages:\n  ```typescript\n  api.interceptors.response.use(\n    response =\u003e response,\n    error =\u003e {\n      if (!error.response) {\n        error.message = 'No internet connection. Please check your network.';\n      } else if (error.response.status \u003e= 500) {\n        error.message = 'Server error. Please try again later.';\n      }\n      return Promise.reject(error);\n    }\n  );\n  ```",
-      "status": "in_progress",
+      "status": "completed",
       "priority": 5,
       "depends_on": [],
       "test_command": "cd mobile \u0026\u0026 npx tsc --noEmit",
       "auto_commit": true,
       "created_at": "",
-      "updated_at": "2026-02-15T07:19:21Z"
+      "updated_at": "2026-02-15T07:31:26Z"
     },
     {
       "id": "enhance_013",
       "title": "Update legal pages with correct app name and privacy URL routing",
       "description": "The legal handler at backend/internal/handlers/legal_handler.go uses hardcoded HTML with the app name 'Snapstreak'. The settings screen links to external URLs (snapstreak.app/privacy and snapstreak.app/terms) that don't exist. The backend already serves legal pages at /api/legal/privacy and /api/legal/terms — the mobile app should use these.\n\nModify mobile/app/(protected)/settings.tsx:\n1. Change the Privacy Policy onPress (line 268) from:\n   `Linking.openURL('https://snapstreak.app/privacy')`\n   to use the API URL:\n   ```typescript\n   const API_BASE = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:8080/api';\n   Linking.openURL(`${API_BASE.replace('/api', '')}/api/legal/privacy`);\n   ```\n\n2. Change the Terms of Service onPress (line 275) similarly:\n   ```typescript\n   Linking.openURL(`${API_BASE.replace('/api', '')}/api/legal/terms`);\n   ```\n\nModify backend/internal/handlers/legal_handler.go:\n1. Update the app name references from 'Snapstreak' to 'StreakSnap' throughout both HTML templates\n2. Update the last updated date from 'February 7, 2026' to 'February 14, 2026'\n3. Add viewport meta tag for mobile rendering: `\u003cmeta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\"\u003e`\n4. Add dark background styling to match the app theme: `body { background-color: #030712; color: #e5e7eb; font-family: -apple-system, sans-serif; padding: 20px; max-width: 600px; margin: 0 auto; }` and links in orange: `a { color: #f97316; }`\n5. Ensure both legal pages mention the correct contact email and include RevenueCat subscription terms in the Terms of Service page",
-      "status": "pending",
+      "status": "in_progress",
       "priority": 5,
       "depends_on": [],
       "test_command": "cd backend \u0026\u0026 go build ./...",
       "auto_commit": true,
       "created_at": "",
-      "updated_at": ""
+      "updated_at": "2026-02-15T07:31:26Z"
     }
   ]
 }
