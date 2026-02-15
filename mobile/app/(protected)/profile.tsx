@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { View, Text, ScrollView, Pressable, ActivityIndicator, Alert } from 'react-native';
+import { View, Text, ScrollView, Pressable, Alert, RefreshControl, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
@@ -30,17 +30,52 @@ interface ProfileData {
   created_at: string;
 }
 
+const generateDateGrid = (numDays: number): string[] => {
+  const dates: string[] = [];
+  const today = new Date();
+  for (let i = numDays - 1; i >= 0; i--) {
+    const date = new Date(today);
+    date.setDate(date.getDate() - i);
+    dates.push(date.toISOString().split('T')[0]);
+  }
+  return dates;
+};
+
 export default function ProfileScreen() {
   const { user, isGuest, logout } = useAuth();
   const router = useRouter();
   const [streak, setStreak] = useState<SnapStreak | null>(null);
   const [profile, setProfile] = useState<ProfileData | null>(null);
+  const [snapDates, setSnapDates] = useState<string[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [calendarLoading, setCalendarLoading] = useState(true);
+  const [calendarError, setCalendarError] = useState<string | null>(null);
+  const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  const todayStr = new Date().toISOString().split('T')[0];
+
+  const hasSnapOnDate = (dateStr: string): boolean => {
+    return snapDates.includes(dateStr);
+  };
+
+  const fetchCalendarData = async () => {
+    try {
+      setCalendarError(null);
+      const response = await api.get('/snaps/calendar?days=35');
+      setSnapDates(response.data.dates || []);
+    } catch (err: any) {
+      console.error('Failed to fetch calendar data:', err);
+      setCalendarError('Unable to load activity data');
+    } finally {
+      setCalendarLoading(false);
+    }
+  };
 
   const fetchProfileData = useCallback(async () => {
     if (isGuest) {
       setIsLoading(false);
+      setCalendarLoading(false);
       return;
     }
     setIsLoading(true);
@@ -58,10 +93,21 @@ export default function ProfileScreen() {
     } finally {
       setIsLoading(false);
     }
+    fetchCalendarData();
   }, [isGuest]);
 
   useEffect(() => {
     fetchProfileData();
+  }, [fetchProfileData]);
+
+  const onRefresh = useCallback(() => {
+    setRefreshing(true);
+    setCalendarLoading(true);
+    Promise.all([
+      fetchProfileData(),
+    ]).finally(() => {
+      setRefreshing(false);
+    });
   }, [fetchProfileData]);
 
   const formatMemberSince = (dateString: string): string => {
@@ -121,10 +167,22 @@ export default function ProfileScreen() {
   }
 
   const firstLetter = (profile?.email || user?.email || 'G').charAt(0).toUpperCase();
+  const allDates = generateDateGrid(35);
 
   return (
     <SafeAreaView className="flex-1 bg-gray-950" edges={['top']}>
-      <ScrollView className="flex-1" showsVerticalScrollIndicator={false}>
+      <ScrollView
+        className="flex-1"
+        showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={onRefresh}
+            tintColor="#f97316"
+            colors={['#f97316']}
+          />
+        }
+      >
         {/* Avatar Section */}
         <View className="items-center pt-8 pb-6">
           <View className="h-20 w-20 rounded-full bg-orange-500/20 items-center justify-center">
@@ -199,6 +257,95 @@ export default function ProfileScreen() {
               {streak?.total_snaps || 0}
             </Text>
             <Text className="text-xs text-gray-500 mt-1">Total Snaps</Text>
+          </View>
+        </View>
+
+        {/* Activity Heatmap */}
+        <View className="mx-6 mt-8">
+          <View className="flex-row items-center mb-3">
+            <Ionicons name="calendar" size={20} color="#f97316" />
+            <Text className="text-lg font-bold text-white ml-2">Activity</Text>
+            <Text className="text-sm text-gray-500 ml-2">Last 5 weeks</Text>
+          </View>
+
+          <View className="bg-gray-900 rounded-2xl p-4">
+            {calendarLoading ? (
+              <View className="items-center py-8">
+                <ActivityIndicator size="large" color="#f97316" />
+                <Text className="text-gray-400 mt-3">Loading activity...</Text>
+              </View>
+            ) : calendarError ? (
+              <View className="items-center py-8">
+                <Ionicons name="alert-circle-outline" size={40} color="#ef4444" />
+                <Text className="text-red-400 mt-2">{calendarError}</Text>
+                <Pressable
+                  onPress={() => {
+                    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                    setCalendarLoading(true);
+                    fetchCalendarData();
+                  }}
+                  className="mt-3 px-4 py-2 bg-gray-800 rounded-lg"
+                >
+                  <Text className="text-orange-400">Retry</Text>
+                </Pressable>
+              </View>
+            ) : (
+              <>
+                {/* Day Labels Row */}
+                <View className="flex-row justify-between mb-2 px-1">
+                  {['S', 'M', 'T', 'W', 'T', 'F', 'S'].map((day, index) => (
+                    <Text
+                      key={index}
+                      className="text-xs text-gray-500 text-center"
+                      style={{ width: 36 }}
+                    >
+                      {day}
+                    </Text>
+                  ))}
+                </View>
+
+                {/* Heatmap Grid - 5 rows x 7 columns */}
+                <View style={{ gap: 4 }}>
+                  {Array.from({ length: 5 }).map((_, rowIndex) => (
+                    <View key={rowIndex} className="flex-row justify-between">
+                      {Array.from({ length: 7 }).map((_, colIndex) => {
+                        const dayIndex = rowIndex * 7 + colIndex;
+                        const dateStr = allDates[dayIndex];
+                        const hasSnap = hasSnapOnDate(dateStr);
+                        const isTodayCell = dateStr === todayStr;
+
+                        return (
+                          <View
+                            key={colIndex}
+                            className={`items-center justify-center rounded-sm ${hasSnap ? 'bg-orange-500' : 'bg-gray-800'}`}
+                            style={[
+                              { width: 36, height: 36 },
+                              isTodayCell ? { borderWidth: 2, borderColor: '#fb923c' } : {},
+                            ]}
+                          >
+                            <Text
+                              className={`text-xs ${hasSnap ? 'text-white font-semibold' : 'text-gray-500'}`}
+                            >
+                              {new Date(dateStr + 'T00:00:00').getDate()}
+                            </Text>
+                          </View>
+                        );
+                      })}
+                    </View>
+                  ))}
+                </View>
+
+                {/* Legend */}
+                <View className="flex-row items-center justify-end mt-4" style={{ gap: 8 }}>
+                  <Text className="text-xs text-gray-500">Less</Text>
+                  <View className="rounded-sm bg-gray-800" style={{ width: 16, height: 16 }} />
+                  <View className="rounded-sm bg-orange-500/50" style={{ width: 16, height: 16 }} />
+                  <View className="rounded-sm bg-orange-500" style={{ width: 16, height: 16 }} />
+                  <View className="rounded-sm bg-orange-400" style={{ width: 16, height: 16 }} />
+                  <Text className="text-xs text-gray-500">More</Text>
+                </View>
+              </>
+            )}
           </View>
         </View>
 

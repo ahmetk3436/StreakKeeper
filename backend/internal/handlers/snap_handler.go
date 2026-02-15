@@ -230,6 +230,36 @@ func (h *SnapHandler) AddFreeze(c *fiber.Ctx) error {
 	})
 }
 
+// GetSnapCalendar handles GET /snaps/calendar — returns an array of date strings for the user's snap activity.
+func (h *SnapHandler) GetSnapCalendar(c *fiber.Ctx) error {
+	userID, err := extractUserID(c)
+	if err != nil {
+		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
+			"error": "Unauthorized",
+		})
+	}
+
+	days := c.QueryInt("days", 35)
+	if days < 7 {
+		days = 7
+	}
+	if days > 90 {
+		days = 90
+	}
+
+	dates, err := h.snapService.GetSnapDates(userID, days)
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"error": "Failed to retrieve calendar data",
+		})
+	}
+
+	return c.JSON(fiber.Map{
+		"dates": dates,
+		"days":  days,
+	})
+}
+
 // DeleteSnap handles DELETE /snaps/:id — soft deletes a snap if owned by the user.
 func (h *SnapHandler) DeleteSnap(c *fiber.Ctx) error {
 	userID, err := extractUserID(c)

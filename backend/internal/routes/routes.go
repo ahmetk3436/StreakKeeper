@@ -43,6 +43,7 @@ func Setup(
 	protected.Post("/snaps", snapHandler.CreateSnap)
 	protected.Get("/snaps", snapHandler.GetMySnaps)
 	protected.Get("/snaps/streak", snapHandler.GetStreak)
+	protected.Get("/snaps/calendar", snapHandler.GetSnapCalendar)
 	protected.Post("/snaps/streak/freeze", snapHandler.AddFreeze)
 	protected.Delete("/snaps/:id", snapHandler.DeleteSnap)
 	protected.Post("/snaps/:id/like", snapHandler.LikeSnap)

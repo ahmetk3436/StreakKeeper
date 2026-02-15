@@ -64,25 +64,25 @@
       "id": "enhance_006",
       "title": "Enhance onboarding with animated transitions and gradient backgrounds",
       "description": "The onboarding at mobile/app/(onboarding)/index.tsx is functional but visually plain — just icons on a dark background. For App Store quality, it needs gradient backgrounds, animated transitions, and more engaging copy.\n\nModify mobile/app/(onboarding)/index.tsx:\n1. Import LinearGradient from 'expo-linear-gradient' and Animated from 'react-native'\n2. Replace the plain bg-gray-950 with per-page gradient backgrounds:\n   - Page 1: LinearGradient colors={['#1a0a00', '#030712']} (warm dark)\n   - Page 2: LinearGradient colors={['#0a0a1a', '#030712']} (cool dark)\n   - Page 3: LinearGradient colors={['#1a0800', '#030712']} (orange hint)\n3. Increase icon sizes from 80 to 96\n4. Add animated icon entrance: use Animated.Value for scale, start at 0.5, spring to 1.0 when page becomes active\n5. Update PAGES content for better engagement:\n   - Page 1: title 'Your Daily Streak' subtitle 'One photo a day keeps the streak alive'\n   - Page 2: title 'Build Habits That Stick' with features: 'Track your daily photo streak', 'Celebrate milestones \u0026 achievements', 'Share your progress with friends'\n   - Page 3: title 'Start Your Journey' subtitle 'Join thousands building daily habits'\n6. Change CTA buttons on page 3:\n   - Primary button: variant='gradient' title='Try Free — 3 Snaps'\n   - Secondary button: variant='outline' title='I Have an Account'\n7. Add subtitle text under page dots: `\u003cText className=\"text-xs text-gray-600 pb-4\"\u003eSwipe to explore\u003c/Text\u003e` (only on page 0 and 1)\n8. Enlarge dot indicators: h-2.5 w-2.5 for active, h-2 w-2 for inactive, with smooth width transition on active dot (w-6 elongated pill shape)",
-      "status": "in_progress",
+      "status": "completed",
       "priority": 6,
       "depends_on": [],
       "test_command": "cd mobile \u0026\u0026 npx tsc --noEmit",
       "auto_commit": true,
       "created_at": "",
-      "updated_at": "2026-02-15T06:34:24Z"
+      "updated_at": "2026-02-15T06:40:25Z"
     },
     {
       "id": "enhance_007",
       "title": "Add streak heatmap calendar to profile screen",
       "description": "The profile screen at mobile/app/(protected)/profile.tsx only shows 3 stat numbers and 4 achievements. A visual streak heatmap (like GitHub contribution graph) would dramatically increase engagement and give users a tangible visual of their consistency.\n\nBackend changes:\n1. Add endpoint to backend/internal/handlers/snap_handler.go:\n   ```go\n   func (h *SnapHandler) GetSnapCalendar(c *fiber.Ctx) error {\n     userID, _ := extractUserID(c)\n     days := c.QueryInt(\"days\", 30)\n     if days \u003e 90 { days = 90 }\n     since := time.Now().AddDate(0, 0, -days)\n     var snaps []models.Snap\n     h.snapService.db.Where(\"user_id = ? AND snap_date \u003e= ?\", userID, since).\n       Select(\"snap_date\").Find(\u0026snaps)\n     dates := make([]string, len(snaps))\n     for i, s := range snaps { dates[i] = s.SnapDate.Format(\"2006-01-02\") }\n     return c.JSON(fiber.Map{\"dates\": dates})\n   }\n   ```\n   Note: This requires adding a public db accessor or a new service method.\n\n2. Better approach — add to SnapService:\n   ```go\n   func (s *SnapService) GetSnapDates(userID uuid.UUID, days int) ([]string, error) {\n     since := time.Now().AddDate(0, 0, -days)\n     var snaps []models.Snap\n     err := s.db.Where(\"user_id = ? AND snap_date \u003e= ?\", userID, since).\n       Select(\"snap_date\").Find(\u0026snaps).Error\n     dates := make([]string, len(snaps))\n     for i, s := range snaps { dates[i] = s.SnapDate.Format(\"2006-01-02\") }\n     return dates, err\n   }\n   ```\n\n3. Add route: `snaps.Get(\"/calendar\", snapHandler.GetSnapCalendar)`\n\nMobile changes in mobile/app/(protected)/profile.tsx:\n1. Add state: `const [snapDates, setSnapDates] = useState\u003cstring[]\u003e([])`\n2. Fetch GET /snaps/calendar?days=30 in useEffect\n3. Render a 5-row x 7-column grid below achievements:\n   - Each cell = one day, last 35 days\n   - Snapped days: bg-orange-500 rounded-sm\n   - Missed days: bg-gray-800 rounded-sm\n   - Today: border-2 border-orange-400\n   - Cell size: 36x36 with 4px gap\n   - Day labels on top row: S M T W T F S in text-xs text-gray-600\n   - Section title: 'Activity' with flame icon",
-      "status": "pending",
+      "status": "in_progress",
       "priority": 6,
       "depends_on": [],
       "test_command": "cd backend \u0026\u0026 go build ./...",
       "auto_commit": true,
       "created_at": "",
-      "updated_at": ""
+      "updated_at": "2026-02-15T06:40:25Z"
     },
     {
       "id": "enhance_008",

@@ -218,6 +218,36 @@ func (s *SnapService) AddStreakFreeze(userID uuid.UUID) error {
 	return s.db.Save(&streak).Error
 }
 
+// GetSnapDates retrieves all snap dates for a user within the specified number of days.
+// Used for generating the activity heatmap calendar.
+func (s *SnapService) GetSnapDates(userID uuid.UUID, days int) ([]string, error) {
+	if days > 90 {
+		days = 90
+	}
+	if days < 7 {
+		days = 7
+	}
+
+	since := time.Now().AddDate(0, 0, -days)
+
+	var snaps []models.Snap
+	err := s.db.Where("user_id = ? AND snap_date >= ?", userID, since).
+		Select("snap_date").
+		Order("snap_date ASC").
+		Find(&snaps).Error
+
+	if err != nil {
+		return nil, err
+	}
+
+	dates := make([]string, len(snaps))
+	for i, snap := range snaps {
+		dates[i] = snap.SnapDate.Format("2006-01-02")
+	}
+
+	return dates, nil
+}
+
 // GetStreakWithFreezes retrieves the streak data including freeze information.
 func (s *SnapService) GetStreakWithFreezes(userID uuid.UUID) (*models.SnapStreak, error) {
 	var streak models.SnapStreak
