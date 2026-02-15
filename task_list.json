@@ -16,25 +16,25 @@
       "id": "enhance_002",
       "title": "Add user profile endpoint with created_at field",
       "description": "The profile screen hardcodes 'Member since Feb 2026' at mobile/app/(protected)/profile.tsx line 90. The backend has no profile/me endpoint so the frontend cannot fetch the user's actual registration date.\n\nBackend changes:\n1. Add to backend/internal/dto/auth_dto.go a new ProfileResponse struct:\n   ```go\n   type ProfileResponse struct {\n     ID        string `json:\"id\"`\n     Email     string `json:\"email\"`\n     CreatedAt string `json:\"created_at\"`\n   }\n   ```\n\n2. Add to backend/internal/services/auth_service.go:\n   ```go\n   func (s *AuthService) GetProfile(userID uuid.UUID) (*dto.ProfileResponse, error) {\n     var user models.User\n     if err := s.db.Where(\"id = ?\", userID).First(\u0026user).Error; err != nil {\n       return nil, ErrUserNotFound\n     }\n     return \u0026dto.ProfileResponse{\n       ID: user.ID.String(), Email: user.Email,\n       CreatedAt: user.CreatedAt.Format(time.RFC3339),\n     }, nil\n   }\n   ```\n\n3. Add to backend/internal/handlers/auth_handler.go:\n   ```go\n   func (h *AuthHandler) GetProfile(c *fiber.Ctx) error {\n     userID, err := extractUserID(c)\n     // ... get profile from service, return JSON\n   }\n   ```\n\n4. Add route in backend/internal/routes/routes.go under protected auth group:\n   `auth.Get(\"/profile\", authHandler.GetProfile)`\n\nMobile changes in mobile/app/(protected)/profile.tsx:\n- Add state: `const [profile, setProfile] = useState\u003c{created_at: string} | null\u003e(null)`\n- Fetch from `/auth/profile` in useEffect alongside streak data\n- Replace hardcoded 'Member since Feb 2026' with:\n  `Member since ${new Date(profile.created_at).toLocaleDateString('en-US', { month: 'short', year: 'numeric' })}`",
-      "status": "in_progress",
+      "status": "completed",
       "priority": 9,
       "depends_on": [],
       "test_command": "cd backend \u0026\u0026 go build ./...",
       "auto_commit": true,
       "created_at": "",
-      "updated_at": "2026-02-15T06:03:37Z"
+      "updated_at": "2026-02-15T06:08:36Z"
     },
     {
       "id": "enhance_003",
       "title": "Add daily reminder push notifications system",
       "description": "The settings screen at mobile/app/(protected)/settings.tsx has a Daily Reminder toggle (line 220) that only saves to AsyncStorage but never actually schedules push notifications. This is a fake feature.\n\nMobile changes:\n1. Create mobile/lib/notifications.ts:\n   ```typescript\n   import * as Notifications from 'expo-notifications';\n   \n   export async function requestNotificationPermission(): Promise\u003cboolean\u003e {\n     const { status: existing } = await Notifications.getPermissionsAsync();\n     if (existing === 'granted') return true;\n     const { status } = await Notifications.requestPermissionsAsync();\n     return status === 'granted';\n   }\n   \n   export async function scheduleDailyReminder(): Promise\u003cvoid\u003e {\n     await Notifications.cancelAllScheduledNotificationsAsync();\n     await Notifications.scheduleNotificationAsync({\n       content: {\n         title: \"Don't break your streak! 🔥\",\n         body: 'Take your daily snap to keep your streak alive!',\n         sound: 'default',\n       },\n       trigger: { hour: 18, minute: 0, repeats: true },\n     });\n   }\n   \n   export async function cancelDailyReminder(): Promise\u003cvoid\u003e {\n     await Notifications.cancelAllScheduledNotificationsAsync();\n   }\n   ```\n\n2. Modify mobile/app/(protected)/settings.tsx toggleDailyReminder function:\n   - Import { requestNotificationPermission, scheduleDailyReminder, cancelDailyReminder } from '../../lib/notifications'\n   - When toggling ON: call requestNotificationPermission(), if granted call scheduleDailyReminder(), else Alert and keep toggle off\n   - When toggling OFF: call cancelDailyReminder()\n   - Still persist to AsyncStorage for state restoration\n\n3. Configure notification handler in mobile/app/_layout.tsx:\n   ```typescript\n   import * as Notifications from 'expo-notifications';\n   Notifications.setNotificationHandler({\n     handleNotification: async () =\u003e ({\n       shouldShowAlert: true, shouldPlaySound: true, shouldSetBadge: false,\n     }),\n   });\n   ```\n\nexpo-notifications is already available via Expo SDK 54, no new install needed.",
-      "status": "pending",
+      "status": "in_progress",
       "priority": 8,
       "depends_on": [],
       "test_command": "cd mobile \u0026\u0026 npx tsc --noEmit",
       "auto_commit": true,
       "created_at": "",
-      "updated_at": ""
+      "updated_at": "2026-02-15T06:08:36Z"
     },
     {
       "id": "enhance_004",

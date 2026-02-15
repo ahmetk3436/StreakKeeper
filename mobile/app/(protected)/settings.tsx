@@ -15,7 +15,12 @@ import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../../contexts/AuthContext';
 import { useSubscription } from '../../contexts/SubscriptionContext';
 import { isBiometricAvailable, getBiometricType } from '../../lib/biometrics';
-import { hapticWarning, hapticMedium, hapticSuccess } from '../../lib/haptics';
+import { hapticWarning, hapticMedium, hapticSuccess, hapticSelection, hapticError } from '../../lib/haptics';
+import {
+  requestNotificationPermission,
+  scheduleDailyReminder,
+  cancelDailyReminder,
+} from '../../lib/notifications';
 import api from '../../lib/api';
 import Button from '../../components/ui/Button';
 import Modal from '../../components/ui/Modal';
@@ -101,9 +106,33 @@ export default function SettingsScreen() {
     }
   };
 
-  const toggleDailyReminder = async (value: boolean) => {
-    setDailyReminder(value);
-    await AsyncStorage.setItem('daily_reminder_enabled', value.toString());
+  const toggleDailyReminder = async () => {
+    hapticSelection();
+
+    if (!dailyReminder) {
+      // Turning ON - request permission first
+      const granted = await requestNotificationPermission();
+
+      if (granted) {
+        await scheduleDailyReminder();
+        setDailyReminder(true);
+        await AsyncStorage.setItem('daily_reminder_enabled', 'true');
+        hapticSuccess();
+      } else {
+        hapticError();
+        Alert.alert(
+          'Permission Required',
+          'Please enable notifications in your device settings to receive daily reminders.',
+          [{ text: 'OK', style: 'default' }]
+        );
+      }
+    } else {
+      // Turning OFF - cancel notifications
+      await cancelDailyReminder();
+      setDailyReminder(false);
+      await AsyncStorage.setItem('daily_reminder_enabled', 'false');
+      hapticSuccess();
+    }
   };
 
   return (
@@ -219,7 +248,7 @@ export default function SettingsScreen() {
             </View>
             <Switch
               value={dailyReminder}
-              onValueChange={toggleDailyReminder}
+              onValueChange={() => toggleDailyReminder()}
               trackColor={{ true: '#f97316' }}
             />
           </View>
