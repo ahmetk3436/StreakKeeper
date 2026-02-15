@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
   View,
   Text,
@@ -7,10 +7,13 @@ import {
   RefreshControl,
   Image,
   Alert,
+  Animated,
+  Easing,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
+import { LinearGradient } from 'expo-linear-gradient';
 import * as ImagePicker from 'expo-image-picker';
 import { useAuth } from '../../contexts/AuthContext';
 import { useSubscription } from '../../contexts/SubscriptionContext';
@@ -20,6 +23,20 @@ import { shareSnap } from '../../lib/share';
 import Skeleton from '../../components/ui/Skeleton';
 import StreakCelebration, { isMilestone } from '../../components/StreakCelebration';
 import type { SnapStreak, Snap } from '../../types/snap';
+
+const getMotivationalText = (streakCount: number): string => {
+  if (streakCount === 0) {
+    return 'Start your journey today!';
+  } else if (streakCount >= 1 && streakCount <= 6) {
+    return 'Great start! Keep it going!';
+  } else if (streakCount >= 7 && streakCount <= 13) {
+    return 'One week strong! 💪';
+  } else if (streakCount >= 14 && streakCount <= 29) {
+    return "You're on fire! 🔥";
+  } else {
+    return "Unstoppable! You're a legend! 🏆";
+  }
+};
 
 export default function HomeScreen() {
   const { user, isGuest, guestUsageCount, canUseFeature, incrementGuestUsage } = useAuth();
@@ -31,6 +48,59 @@ export default function HomeScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [showCelebration, setShowCelebration] = useState(false);
   const [celebrationStreak, setCelebrationStreak] = useState(0);
+  const [displayCount, setDisplayCount] = useState(0);
+
+  // Animated values
+  const countAnim = useRef(new Animated.Value(0)).current;
+  const pulseAnim = useRef(new Animated.Value(1)).current;
+
+  // Animate streak counter when streak data changes
+  useEffect(() => {
+    if (streak?.current_streak !== undefined && streak?.current_streak !== null) {
+      countAnim.setValue(0);
+      setDisplayCount(0);
+
+      Animated.timing(countAnim, {
+        toValue: streak.current_streak,
+        duration: 1000,
+        easing: Easing.out(Easing.cubic),
+        useNativeDriver: false,
+      }).start();
+
+      const listenerId = countAnim.addListener(({ value }) => {
+        setDisplayCount(Math.round(value));
+      });
+
+      return () => {
+        countAnim.removeListener(listenerId);
+      };
+    }
+  }, [streak?.current_streak]);
+
+  // Pulsing flame animation
+  useEffect(() => {
+    Animated.loop(
+      Animated.sequence([
+        Animated.timing(pulseAnim, {
+          toValue: 1.2,
+          duration: 800,
+          easing: Easing.inOut(Easing.ease),
+          useNativeDriver: true,
+        }),
+        Animated.timing(pulseAnim, {
+          toValue: 1.0,
+          duration: 800,
+          easing: Easing.inOut(Easing.ease),
+          useNativeDriver: true,
+        }),
+      ])
+    ).start();
+
+    return () => {
+      pulseAnim.setValue(1);
+      pulseAnim.stopAnimation();
+    };
+  }, []);
 
   const fetchStreakData = useCallback(async () => {
     if (isGuest) {
@@ -163,15 +233,25 @@ export default function HomeScreen() {
           />
         }
       >
-        {/* Header */}
+        {/* Header with Pulsing Flame */}
         <View className="flex-row items-center justify-between px-6 pt-4">
-          <Text className="text-2xl font-bold text-white">Snapstreak</Text>
-          <View className="flex-row items-center">
-            <Ionicons name="flame" size={28} color="#f97316" />
-            <Text className="text-xl font-bold text-orange-500 ml-1">
-              {streak?.current_streak || 0}
+          <View>
+            <Text className="text-3xl font-bold text-white">StreakKeeper</Text>
+            <Text className="text-base text-gray-500 mt-1">
+              Build habits that stick
             </Text>
           </View>
+
+          <Animated.View
+            style={{
+              transform: [{ scale: pulseAnim }],
+              backgroundColor: '#fff7ed',
+              borderRadius: 20,
+              padding: 10,
+            }}
+          >
+            <Ionicons name="flame" size={28} color="#f97316" />
+          </Animated.View>
         </View>
 
         {/* Guest Badge */}
@@ -183,33 +263,52 @@ export default function HomeScreen() {
           </View>
         )}
 
-        {/* Streak Card */}
-        <View
-          className="mx-6 mt-4 rounded-2xl bg-orange-600 p-6"
+        {/* Gradient Streak Card */}
+        <LinearGradient
+          colors={['#f97316', '#ea580c', '#dc2626']}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          className="mx-6 mt-4 rounded-2xl p-6"
           style={{
             shadowColor: '#f97316',
             shadowOffset: { width: 0, height: 4 },
-            shadowOpacity: 0.3,
-            shadowRadius: 12,
+            shadowOpacity: 0.4,
+            shadowRadius: 16,
             elevation: 8,
           }}
         >
-          <Text className="text-5xl font-bold text-white">
-            {streak?.current_streak || 0}
-          </Text>
-          <Text className="text-orange-200 text-base mt-1">day streak</Text>
-          <View className="flex-row mt-4">
-            <View className="flex-1">
-              <Text className="text-white text-lg font-semibold">
-                {streak?.longest_streak || 0}
-              </Text>
-              <Text className="text-orange-200 text-xs">Best Streak</Text>
+          {/* Animated Streak Number */}
+          <View className="items-center">
+            <Text className="text-7xl font-bold text-white">
+              {displayCount}
+            </Text>
+            <Text className="text-lg text-orange-100 mt-2">Day Streak</Text>
+          </View>
+
+          {/* Motivational Text */}
+          <View className="mt-4 items-center">
+            <Text className="text-base text-white font-medium">
+              {getMotivationalText(streak?.current_streak ?? 0)}
+            </Text>
+          </View>
+
+          {/* Stats Row */}
+          <View className="flex-row mt-4 pt-4 border-t border-orange-400/30">
+            <View className="flex-1 items-center">
+              <View className="flex-row items-center">
+                <Ionicons name="trophy" size={16} color="#fcd34d" />
+                <Text className="text-sm text-orange-100 ml-2">
+                  Longest: {streak?.longest_streak ?? 0} days
+                </Text>
+              </View>
             </View>
-            <View className="flex-1">
-              <Text className="text-white text-lg font-semibold">
-                {streak?.total_snaps || 0}
-              </Text>
-              <Text className="text-orange-200 text-xs">Total Snaps</Text>
+            <View className="flex-1 items-center">
+              <View className="flex-row items-center">
+                <Ionicons name="camera" size={16} color="#fcd34d" />
+                <Text className="text-sm text-orange-100 ml-2">
+                  Total: {streak?.total_snaps ?? 0} snaps
+                </Text>
+              </View>
             </View>
           </View>
 
@@ -234,7 +333,7 @@ export default function HomeScreen() {
               </Text>
             </Pressable>
           )}
-        </View>
+        </LinearGradient>
 
         {/* Streak Status Text */}
         <View className="mx-6 mt-3">
@@ -312,6 +411,33 @@ export default function HomeScreen() {
             <Text className="text-gray-600 text-sm mt-1">
               Take your daily photo
             </Text>
+          </Pressable>
+        )}
+
+        {/* Premium Upsell */}
+        {!isSubscribed && (
+          <Pressable
+            onPress={() => {
+              hapticSelection();
+              router.push('/(protected)/paywall');
+            }}
+            className="mx-6 mt-6 rounded-xl overflow-hidden"
+          >
+            <LinearGradient
+              colors={['#fbbf24', '#f97316']}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 0 }}
+              className="p-4 flex-row items-center"
+            >
+              <Ionicons name="star" size={24} color="white" />
+              <View className="ml-3 flex-1">
+                <Text className="text-white font-bold">Go Premium</Text>
+                <Text className="text-orange-100 text-sm">
+                  Unlock unlimited streaks & insights
+                </Text>
+              </View>
+              <Ionicons name="chevron-forward" size={20} color="white" />
+            </LinearGradient>
           </Pressable>
         )}
 
