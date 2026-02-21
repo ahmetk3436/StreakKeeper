@@ -148,6 +148,27 @@ func (h *AuthHandler) DeleteAccount(c *fiber.Ctx) error {
 	return c.JSON(fiber.Map{"message": "Account deleted successfully"})
 }
 
+// GetProfile handles GET /auth/profile requests
+func (h *AuthHandler) GetProfile(c *fiber.Ctx) error {
+	userID, err := extractUserID(c)
+	if err != nil {
+		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
+			"error": "unauthorized",
+		})
+	}
+
+	profile, err := h.authService.GetProfile(userID)
+	if err != nil {
+		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{
+			"error": "user not found",
+		})
+	}
+
+	return c.Status(fiber.StatusOK).JSON(fiber.Map{
+		"data": profile,
+	})
+}
+
 // AppleSignIn handles Sign in with Apple (Guideline 4.8).
 func (h *AuthHandler) AppleSignIn(c *fiber.Ctx) error {
 	var req dto.AppleSignInRequest

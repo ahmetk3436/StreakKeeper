@@ -14,11 +14,17 @@ func Setup(
 	healthHandler *handlers.HealthHandler,
 	webhookHandler *handlers.WebhookHandler,
 	moderationHandler *handlers.ModerationHandler,
+	snapHandler *handlers.SnapHandler,
+	legalHandler *handlers.LegalHandler,
 ) {
 	api := app.Group("/api")
 
 	// Health
 	api.Get("/health", healthHandler.Check)
+
+	// Legal pages (public)
+	api.Get("/legal/privacy", legalHandler.PrivacyPolicy)
+	api.Get("/legal/terms", legalHandler.TermsOfService)
 
 	// Auth (public)
 	auth := api.Group("/auth")
@@ -30,7 +36,17 @@ func Setup(
 	// Auth (protected)
 	protected := api.Group("", middleware.JWTProtected(cfg))
 	protected.Post("/auth/logout", authHandler.Logout)
+	protected.Get("/auth/profile", authHandler.GetProfile)
 	protected.Delete("/auth/account", authHandler.DeleteAccount) // Account deletion (Guideline 5.1.1)
+
+	// Snap routes (protected)
+	protected.Post("/snaps", snapHandler.CreateSnap)
+	protected.Get("/snaps", snapHandler.GetMySnaps)
+	protected.Get("/snaps/streak", snapHandler.GetStreak)
+	protected.Get("/snaps/calendar", snapHandler.GetSnapCalendar)
+	protected.Post("/snaps/streak/freeze", snapHandler.AddFreeze)
+	protected.Delete("/snaps/:id", snapHandler.DeleteSnap)
+	protected.Post("/snaps/:id/like", snapHandler.LikeSnap)
 
 	// Moderation - User endpoints (protected)
 	protected.Post("/reports", moderationHandler.CreateReport)     // Report content (Guideline 1.2)

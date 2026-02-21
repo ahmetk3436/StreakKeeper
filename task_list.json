@@ -1,0 +1,160 @@
+{
+  "tasks": [
+    {
+      "id": "enhance_001",
+      "title": "Add image upload endpoint with file storage",
+      "description": "CRITICAL: The app currently sends a local file URI (e.g., file:///...) as image_url to POST /snaps, but the backend just stores this string in the database. This means images are never actually uploaded — they only exist on the device and cannot be retrieved later or on another device.\n\nModify backend/internal/handlers/snap_handler.go:\n- Change CreateSnap handler to accept multipart/form-data instead of JSON\n- Parse file upload: `file, err := c.FormFile(\"image\")`\n- Parse caption and filter from form fields: `c.FormValue(\"caption\")`, `c.FormValue(\"filter\")`\n- Create upload directory: `uploads/snaps/` relative to working dir\n- Generate unique filename: `fmt.Sprintf(\"%s_%s%s\", userID.String()[:8], uuid.New().String()[:8], filepath.Ext(file.Filename))`\n- Save file: `c.SaveFile(file, savePath)`\n- Store accessible URL: `fmt.Sprintf(\"/uploads/snaps/%s\", filename)`\n- Validate file size max 10MB, validate content type (image/jpeg, image/png, image/heic)\n\nModify backend/cmd/server/main.go:\n- Add static file serving: `app.Static(\"/uploads\", \"./uploads\")`\n- Create uploads directory on startup: `os.MkdirAll(\"./uploads/snaps\", 0755)`\n\nModify mobile/app/(protected)/snap-create.tsx:\n- Change handlePost to use FormData instead of JSON:\n  ```\n  const formData = new FormData();\n  formData.append('image', { uri: imageUri, name: 'snap.jpg', type: 'image/jpeg' } as any);\n  formData.append('caption', caption);\n  formData.append('filter', selectedFilter);\n  await api.post('/snaps', formData, { headers: { 'Content-Type': 'multipart/form-data' } });\n  ```\n\nModify mobile/lib/api.ts:\n- Increase timeout to 30000 for upload support\n- Add request interceptor check: if Content-Type is multipart/form-data, don't override it",
+      "status": "completed",
+      "priority": 10,
+      "depends_on": [],
+      "test_command": "cd backend \u0026\u0026 go build ./...",
+      "auto_commit": true,
+      "created_at": "",
+      "updated_at": "2026-02-15T06:03:37Z"
+    },
+    {
+      "id": "enhance_002",
+      "title": "Add user profile endpoint with created_at field",
+      "description": "The profile screen hardcodes 'Member since Feb 2026' at mobile/app/(protected)/profile.tsx line 90. The backend has no profile/me endpoint so the frontend cannot fetch the user's actual registration date.\n\nBackend changes:\n1. Add to backend/internal/dto/auth_dto.go a new ProfileResponse struct:\n   ```go\n   type ProfileResponse struct {\n     ID        string `json:\"id\"`\n     Email     string `json:\"email\"`\n     CreatedAt string `json:\"created_at\"`\n   }\n   ```\n\n2. Add to backend/internal/services/auth_service.go:\n   ```go\n   func (s *AuthService) GetProfile(userID uuid.UUID) (*dto.ProfileResponse, error) {\n     var user models.User\n     if err := s.db.Where(\"id = ?\", userID).First(\u0026user).Error; err != nil {\n       return nil, ErrUserNotFound\n     }\n     return \u0026dto.ProfileResponse{\n       ID: user.ID.String(), Email: user.Email,\n       CreatedAt: user.CreatedAt.Format(time.RFC3339),\n     }, nil\n   }\n   ```\n\n3. Add to backend/internal/handlers/auth_handler.go:\n   ```go\n   func (h *AuthHandler) GetProfile(c *fiber.Ctx) error {\n     userID, err := extractUserID(c)\n     // ... get profile from service, return JSON\n   }\n   ```\n\n4. Add route in backend/internal/routes/routes.go under protected auth group:\n   `auth.Get(\"/profile\", authHandler.GetProfile)`\n\nMobile changes in mobile/app/(protected)/profile.tsx:\n- Add state: `const [profile, setProfile] = useState\u003c{created_at: string} | null\u003e(null)`\n- Fetch from `/auth/profile` in useEffect alongside streak data\n- Replace hardcoded 'Member since Feb 2026' with:\n  `Member since ${new Date(profile.created_at).toLocaleDateString('en-US', { month: 'short', year: 'numeric' })}`",
+      "status": "completed",
+      "priority": 9,
+      "depends_on": [],
+      "test_command": "cd backend \u0026\u0026 go build ./...",
+      "auto_commit": true,
+      "created_at": "",
+      "updated_at": "2026-02-15T06:08:36Z"
+    },
+    {
+      "id": "enhance_003",
+      "title": "Add daily reminder push notifications system",
+      "description": "The settings screen at mobile/app/(protected)/settings.tsx has a Daily Reminder toggle (line 220) that only saves to AsyncStorage but never actually schedules push notifications. This is a fake feature.\n\nMobile changes:\n1. Create mobile/lib/notifications.ts:\n   ```typescript\n   import * as Notifications from 'expo-notifications';\n   \n   export async function requestNotificationPermission(): Promise\u003cboolean\u003e {\n     const { status: existing } = await Notifications.getPermissionsAsync();\n     if (existing === 'granted') return true;\n     const { status } = await Notifications.requestPermissionsAsync();\n     return status === 'granted';\n   }\n   \n   export async function scheduleDailyReminder(): Promise\u003cvoid\u003e {\n     await Notifications.cancelAllScheduledNotificationsAsync();\n     await Notifications.scheduleNotificationAsync({\n       content: {\n         title: \"Don't break your streak! 🔥\",\n         body: 'Take your daily snap to keep your streak alive!',\n         sound: 'default',\n       },\n       trigger: { hour: 18, minute: 0, repeats: true },\n     });\n   }\n   \n   export async function cancelDailyReminder(): Promise\u003cvoid\u003e {\n     await Notifications.cancelAllScheduledNotificationsAsync();\n   }\n   ```\n\n2. Modify mobile/app/(protected)/settings.tsx toggleDailyReminder function:\n   - Import { requestNotificationPermission, scheduleDailyReminder, cancelDailyReminder } from '../../lib/notifications'\n   - When toggling ON: call requestNotificationPermission(), if granted call scheduleDailyReminder(), else Alert and keep toggle off\n   - When toggling OFF: call cancelDailyReminder()\n   - Still persist to AsyncStorage for state restoration\n\n3. Configure notification handler in mobile/app/_layout.tsx:\n   ```typescript\n   import * as Notifications from 'expo-notifications';\n   Notifications.setNotificationHandler({\n     handleNotification: async () =\u003e ({\n       shouldShowAlert: true, shouldPlaySound: true, shouldSetBadge: false,\n     }),\n   });\n   ```\n\nexpo-notifications is already available via Expo SDK 54, no new install needed.",
+      "status": "completed",
+      "priority": 8,
+      "depends_on": [],
+      "test_command": "cd mobile \u0026\u0026 npx tsc --noEmit",
+      "auto_commit": true,
+      "created_at": "",
+      "updated_at": "2026-02-15T06:20:55Z"
+    },
+    {
+      "id": "enhance_004",
+      "title": "Add snap deletion from history with swipe gesture",
+      "description": "The history screen at mobile/app/(protected)/history.tsx displays snaps but provides no way for users to delete them, even though the backend has DELETE /snaps/:id endpoint fully implemented. This is a missing feature.\n\nModify mobile/app/(protected)/history.tsx:\n1. Import Animated from 'react-native' and hapticWarning, hapticSuccess from '../../lib/haptics'\n2. Add delete handler:\n   ```typescript\n   const handleDeleteSnap = async (snapId: string) =\u003e {\n     hapticWarning();\n     Alert.alert(\n       'Delete Snap',\n       'Are you sure you want to delete this snap? This cannot be undone.',\n       [\n         { text: 'Cancel', style: 'cancel' },\n         {\n           text: 'Delete', style: 'destructive',\n           onPress: async () =\u003e {\n             try {\n               await api.delete(`/snaps/${snapId}`);\n               setSnaps(prev =\u003e prev.filter(s =\u003e s.id !== snapId));\n               setTotal(prev =\u003e prev - 1);\n               hapticSuccess();\n             } catch (error) {\n               Alert.alert('Error', 'Failed to delete snap');\n             }\n           },\n         },\n       ]\n     );\n   };\n   ```\n3. Add a delete button (trash icon) to each snap card in renderSnap, positioned at the top-right of the card:\n   ```tsx\n   \u003cPressable\n     onPress={() =\u003e handleDeleteSnap(item.id)}\n     className=\"absolute top-3 right-3 h-8 w-8 rounded-full bg-black/50 items-center justify-center\"\n   \u003e\n     \u003cIonicons name=\"trash-outline\" size={16} color=\"#ef4444\" /\u003e\n   \u003c/Pressable\u003e\n   ```\n4. Add share button to each snap card next to the like count, using shareSnap from '../../lib/share':\n   ```tsx\n   \u003cPressable onPress={() =\u003e shareSnap(item.caption)} className=\"flex-row items-center\"\u003e\n     \u003cIonicons name=\"share-outline\" size={14} color=\"#6b7280\" /\u003e\n     \u003cText className=\"text-sm text-gray-500 ml-1\"\u003eShare\u003c/Text\u003e\n   \u003c/Pressable\u003e\n   ```",
+      "status": "completed",
+      "priority": 7,
+      "depends_on": [],
+      "test_command": "cd mobile \u0026\u0026 npx tsc --noEmit",
+      "auto_commit": true,
+      "created_at": "",
+      "updated_at": "2026-02-15T06:25:03Z"
+    },
+    {
+      "id": "enhance_005",
+      "title": "Add streak freeze and recovery backend logic",
+      "description": "The app has no streak protection mechanism. If a user misses one day, their entire streak resets to 1. This is frustrating for engaged users and increases churn. Add a streak freeze feature (premium-only) that allows users to protect their streak for 1 missed day.\n\nBackend changes:\n1. Add fields to backend/internal/models/snap.go SnapStreak model:\n   ```go\n   FreezesAvailable int  `json:\"freezes_available\" gorm:\"default:0\"`\n   FreezesUsed      int  `json:\"freezes_used\" gorm:\"default:0\"`\n   LastFreezeDate   time.Time `json:\"last_freeze_date\"`\n   ```\n\n2. Modify backend/internal/services/snap_service.go updateStreak method:\n   - In the 'streak broken' else branch (line 100-101), before resetting to 1:\n   - Check if streak.FreezesAvailable \u003e 0\n   - If yes: decrement FreezesAvailable, increment FreezesUsed, set LastFreezeDate=now, keep CurrentStreak unchanged (don't reset)\n   - If no: reset CurrentStreak to 1 (existing behavior)\n\n3. Add method to SnapService:\n   ```go\n   func (s *SnapService) AddStreakFreeze(userID uuid.UUID) error {\n     var streak models.SnapStreak\n     err := s.db.Where(\"user_id = ?\", userID).First(\u0026streak).Error\n     if errors.Is(err, gorm.ErrRecordNotFound) {\n       return errors.New(\"no streak record found\")\n     }\n     if streak.FreezesAvailable \u003e= 3 {\n       return errors.New(\"maximum freezes reached\")\n     }\n     streak.FreezesAvailable++\n     return s.db.Save(\u0026streak).Error\n   }\n   ```\n\n4. Add handler in backend/internal/handlers/snap_handler.go:\n   ```go\n   func (h *SnapHandler) AddFreeze(c *fiber.Ctx) error { ... }\n   ```\n\n5. Add route: `snaps.Post(\"/streak/freeze\", snapHandler.AddFreeze)`\n\n6. Update StreakResponse DTO in backend/internal/dto/snap_dto.go to include FreezesAvailable int and FreezesUsed int\n\n7. Update mobile/types/snap.ts SnapStreak interface to include freezes_available and freezes_used\n\n8. Update mobile/app/(protected)/home.tsx to show freeze count below streak card: a small pill showing '🛡️ {freezes} freezes' in blue if \u003e 0",
+      "status": "completed",
+      "priority": 7,
+      "depends_on": [],
+      "test_command": "cd backend \u0026\u0026 go build ./...",
+      "auto_commit": true,
+      "created_at": "",
+      "updated_at": "2026-02-15T06:34:24Z"
+    },
+    {
+      "id": "enhance_006",
+      "title": "Enhance onboarding with animated transitions and gradient backgrounds",
+      "description": "The onboarding at mobile/app/(onboarding)/index.tsx is functional but visually plain — just icons on a dark background. For App Store quality, it needs gradient backgrounds, animated transitions, and more engaging copy.\n\nModify mobile/app/(onboarding)/index.tsx:\n1. Import LinearGradient from 'expo-linear-gradient' and Animated from 'react-native'\n2. Replace the plain bg-gray-950 with per-page gradient backgrounds:\n   - Page 1: LinearGradient colors={['#1a0a00', '#030712']} (warm dark)\n   - Page 2: LinearGradient colors={['#0a0a1a', '#030712']} (cool dark)\n   - Page 3: LinearGradient colors={['#1a0800', '#030712']} (orange hint)\n3. Increase icon sizes from 80 to 96\n4. Add animated icon entrance: use Animated.Value for scale, start at 0.5, spring to 1.0 when page becomes active\n5. Update PAGES content for better engagement:\n   - Page 1: title 'Your Daily Streak' subtitle 'One photo a day keeps the streak alive'\n   - Page 2: title 'Build Habits That Stick' with features: 'Track your daily photo streak', 'Celebrate milestones \u0026 achievements', 'Share your progress with friends'\n   - Page 3: title 'Start Your Journey' subtitle 'Join thousands building daily habits'\n6. Change CTA buttons on page 3:\n   - Primary button: variant='gradient' title='Try Free — 3 Snaps'\n   - Secondary button: variant='outline' title='I Have an Account'\n7. Add subtitle text under page dots: `\u003cText className=\"text-xs text-gray-600 pb-4\"\u003eSwipe to explore\u003c/Text\u003e` (only on page 0 and 1)\n8. Enlarge dot indicators: h-2.5 w-2.5 for active, h-2 w-2 for inactive, with smooth width transition on active dot (w-6 elongated pill shape)",
+      "status": "completed",
+      "priority": 6,
+      "depends_on": [],
+      "test_command": "cd mobile \u0026\u0026 npx tsc --noEmit",
+      "auto_commit": true,
+      "created_at": "",
+      "updated_at": "2026-02-15T06:40:25Z"
+    },
+    {
+      "id": "enhance_007",
+      "title": "Add streak heatmap calendar to profile screen",
+      "description": "The profile screen at mobile/app/(protected)/profile.tsx only shows 3 stat numbers and 4 achievements. A visual streak heatmap (like GitHub contribution graph) would dramatically increase engagement and give users a tangible visual of their consistency.\n\nBackend changes:\n1. Add endpoint to backend/internal/handlers/snap_handler.go:\n   ```go\n   func (h *SnapHandler) GetSnapCalendar(c *fiber.Ctx) error {\n     userID, _ := extractUserID(c)\n     days := c.QueryInt(\"days\", 30)\n     if days \u003e 90 { days = 90 }\n     since := time.Now().AddDate(0, 0, -days)\n     var snaps []models.Snap\n     h.snapService.db.Where(\"user_id = ? AND snap_date \u003e= ?\", userID, since).\n       Select(\"snap_date\").Find(\u0026snaps)\n     dates := make([]string, len(snaps))\n     for i, s := range snaps { dates[i] = s.SnapDate.Format(\"2006-01-02\") }\n     return c.JSON(fiber.Map{\"dates\": dates})\n   }\n   ```\n   Note: This requires adding a public db accessor or a new service method.\n\n2. Better approach — add to SnapService:\n   ```go\n   func (s *SnapService) GetSnapDates(userID uuid.UUID, days int) ([]string, error) {\n     since := time.Now().AddDate(0, 0, -days)\n     var snaps []models.Snap\n     err := s.db.Where(\"user_id = ? AND snap_date \u003e= ?\", userID, since).\n       Select(\"snap_date\").Find(\u0026snaps).Error\n     dates := make([]string, len(snaps))\n     for i, s := range snaps { dates[i] = s.SnapDate.Format(\"2006-01-02\") }\n     return dates, err\n   }\n   ```\n\n3. Add route: `snaps.Get(\"/calendar\", snapHandler.GetSnapCalendar)`\n\nMobile changes in mobile/app/(protected)/profile.tsx:\n1. Add state: `const [snapDates, setSnapDates] = useState\u003cstring[]\u003e([])`\n2. Fetch GET /snaps/calendar?days=30 in useEffect\n3. Render a 5-row x 7-column grid below achievements:\n   - Each cell = one day, last 35 days\n   - Snapped days: bg-orange-500 rounded-sm\n   - Missed days: bg-gray-800 rounded-sm\n   - Today: border-2 border-orange-400\n   - Cell size: 36x36 with 4px gap\n   - Day labels on top row: S M T W T F S in text-xs text-gray-600\n   - Section title: 'Activity' with flame icon",
+      "status": "completed",
+      "priority": 6,
+      "depends_on": [],
+      "test_command": "cd backend \u0026\u0026 go build ./...",
+      "auto_commit": true,
+      "created_at": "",
+      "updated_at": "2026-02-15T06:48:12Z"
+    },
+    {
+      "id": "enhance_008",
+      "title": "Add real image filters with opacity overlays on snap-create",
+      "description": "The filter selector at mobile/app/(protected)/snap-create.tsx shows colored circles but the filters have NO visual effect on the image preview. The selected filter is just a string sent to the backend. Users expect to see the filter applied to the image before posting.\n\nModify mobile/app/(protected)/snap-create.tsx:\n1. Define filter overlay styles with semi-transparent color overlays:\n   ```typescript\n   const FILTER_OVERLAYS: Record\u003cstring, { color: string; opacity: number; blendMode?: string }\u003e = {\n     none: { color: 'transparent', opacity: 0 },\n     vintage: { color: '#d97706', opacity: 0.2 },\n     warm: { color: '#ea580c', opacity: 0.15 },\n     cool: { color: '#3b82f6', opacity: 0.2 },\n     dramatic: { color: '#000000', opacity: 0.35 },\n     minimal: { color: '#ffffff', opacity: 0.1 },\n     vibrant: { color: '#9333ea', opacity: 0.15 },\n     noir: { color: '#000000', opacity: 0.5 },\n   };\n   ```\n\n2. Wrap the Image component in a View with overflow hidden, and add an absolute-positioned overlay View on top:\n   ```tsx\n   \u003cView className=\"mx-6 mt-4 rounded-2xl overflow-hidden\" style={{ height: 350 }}\u003e\n     \u003cImage source={{ uri: imageUri }} className=\"w-full h-full\" resizeMode=\"cover\" /\u003e\n     {selectedFilter !== 'none' \u0026\u0026 (\n       \u003cView\n         className=\"absolute inset-0\"\n         style={{\n           backgroundColor: FILTER_OVERLAYS[selectedFilter].color,\n           opacity: FILTER_OVERLAYS[selectedFilter].opacity,\n         }}\n       /\u003e\n     )}\n   \u003c/View\u003e\n   ```\n\n3. Add filter name label below image: \n   ```tsx\n   {selectedFilter !== 'none' \u0026\u0026 (\n     \u003cText className=\"text-center text-sm text-orange-400 mt-2 capitalize\"\u003e\n       {selectedFilter} filter applied\n     \u003c/Text\u003e\n   )}\n   ```\n\n4. Add mini preview thumbnails in filter selector: each filter circle should show a tiny 48x48 version of the image with the overlay applied, instead of just a solid color circle. Use the Image component at 48x48 with the overlay on top.",
+      "status": "completed",
+      "priority": 6,
+      "depends_on": [],
+      "test_command": "cd mobile \u0026\u0026 npx tsc --noEmit",
+      "auto_commit": true,
+      "created_at": "",
+      "updated_at": "2026-02-15T06:53:30Z"
+    },
+    {
+      "id": "enhance_009",
+      "title": "Add streak sharing with shareable result card",
+      "description": "The app has a ShareableResult component at mobile/components/ui/ShareableResult.tsx and share utilities at mobile/lib/share.ts, but the home screen only has a basic text share on today's snap. Users should be able to share a beautiful branded streak card for milestone celebrations and from the profile screen.\n\nModify mobile/components/StreakCelebration.tsx:\n1. Import ShareableResult from '../components/ui/ShareableResult'\n2. Import { shareStreak } from '../lib/share'\n3. Replace the 'Share Achievement' button's onPress to call shareStreak(streakCount)\n4. Add a ShareableResult component inside the modal that's visible before sharing:\n   ```tsx\n   \u003cShareableResult\n     title=\"Streak Milestone!\"\n     resultText={`${streakCount} Day Streak`}\n     icon=\"flame\"\n     colors={['#f97316', '#ea580c', '#dc2626']}\n   /\u003e\n   ```\n\nModify mobile/app/(protected)/profile.tsx:\n1. Import { shareStreak } from '../../lib/share' and { hapticMedium } from '../../lib/haptics'\n2. Add a 'Share My Stats' button below the achievements section:\n   ```tsx\n   \u003cPressable\n     onPress={() =\u003e { hapticMedium(); shareStreak(streak?.current_streak || 0); }}\n     className=\"mx-6 mt-6 mb-4 flex-row items-center justify-center p-4 rounded-2xl bg-orange-500/10 border border-orange-500/20\"\n   \u003e\n     \u003cIonicons name=\"share-social-outline\" size={20} color=\"#f97316\" /\u003e\n     \u003cText className=\"text-base font-semibold text-orange-500 ml-2\"\u003eShare My Streak\u003c/Text\u003e\n   \u003c/Pressable\u003e\n   ```\n\nModify mobile/lib/share.ts:\n- Enhance shareStreak message to include more engaging copy:\n  ```typescript\n  export const shareStreak = async (count: number) =\u003e {\n    const messages = [\n      `I'm on a ${count}-day streak on Snapstreak! Can you beat me?`,\n      `${count} days and counting! My Snapstreak game is strong 🔥`,\n      `Day ${count} of my photo streak! Join me on Snapstreak!`,\n    ];\n    const message = messages[count % messages.length];\n    await Share.share({ message });\n  };\n  ```",
+      "status": "completed",
+      "priority": 6,
+      "depends_on": [],
+      "test_command": "cd mobile \u0026\u0026 npx tsc --noEmit",
+      "auto_commit": true,
+      "created_at": "",
+      "updated_at": "2026-02-15T07:02:16Z"
+    },
+    {
+      "id": "enhance_010",
+      "title": "Add animated streak counter and gradient header to home",
+      "description": "The home screen at mobile/app/(protected)/home.tsx has a static streak card with bg-orange-600. Enhance it with an animated counter, LinearGradient background, and pulsing flame animation for a more premium feel.\n\nModify mobile/app/(protected)/home.tsx:\n1. Import LinearGradient from 'expo-linear-gradient'\n2. Import { useRef, useEffect } from 'react' and Animated, Easing from 'react-native'\n\n3. Add animated streak counter that counts up from 0 to current value on mount:\n   ```typescript\n   const countAnim = useRef(new Animated.Value(0)).current;\n   const [displayCount, setDisplayCount] = useState(0);\n   useEffect(() =\u003e {\n     if (streak?.current_streak) {\n       Animated.timing(countAnim, {\n         toValue: streak.current_streak,\n         duration: 1000,\n         easing: Easing.out(Easing.cubic),\n         useNativeDriver: false,\n       }).start();\n       countAnim.addListener(({ value }) =\u003e setDisplayCount(Math.round(value)));\n       return () =\u003e countAnim.removeAllListeners();\n     }\n   }, [streak?.current_streak]);\n   ```\n\n4. Replace the streak card View (bg-orange-600) with LinearGradient:\n   ```tsx\n   \u003cLinearGradient\n     colors={['#f97316', '#ea580c', '#dc2626']}\n     start={{ x: 0, y: 0 }}\n     end={{ x: 1, y: 1 }}\n     className=\"mx-6 mt-4 rounded-2xl p-6\"\n     style={{ shadowColor: '#f97316', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.4, shadowRadius: 16, elevation: 8 }}\n   \u003e\n   ```\n\n5. Use displayCount instead of streak?.current_streak in the 5xl text\n\n6. Add a pulsing flame icon animation in the header (right side):\n   ```typescript\n   const pulseAnim = useRef(new Animated.Value(1)).current;\n   useEffect(() =\u003e {\n     Animated.loop(\n       Animated.sequence([\n         Animated.timing(pulseAnim, { toValue: 1.2, duration: 800, useNativeDriver: true }),\n         Animated.timing(pulseAnim, { toValue: 1.0, duration: 800, useNativeDriver: true }),\n       ])\n     ).start();\n   }, []);\n   ```\n   Wrap the flame Ionicons in Animated.View with transform: [{ scale: pulseAnim }]\n\n7. Add motivational text that changes based on streak count:\n   - 0: 'Start your journey today!'\n   - 1-6: 'Great start! Keep it going!'\n   - 7-13: 'One week strong! 💪'\n   - 14-29: 'You're on fire! 🔥'\n   - 30+: 'Unstoppable! You're a legend! 🏆'",
+      "status": "completed",
+      "priority": 6,
+      "depends_on": [],
+      "test_command": "cd mobile \u0026\u0026 npx tsc --noEmit",
+      "auto_commit": true,
+      "created_at": "",
+      "updated_at": "2026-02-15T07:10:39Z"
+    },
+    {
+      "id": "enhance_011",
+      "title": "Add gallery picker option alongside camera for snap creation",
+      "description": "Currently users can ONLY take photos with the camera to create snaps (via ImagePicker.launchCameraAsync). Many users want to post existing photos from their gallery. Add a gallery option.\n\nModify mobile/app/(protected)/_layout.tsx handleSnapPress function:\n- Replace the direct camera launch with an ActionSheet that offers two options:\n  ```typescript\n  const handleSnapPress = () =\u003e {\n    hapticSelection();\n    Alert.alert(\n      'New Snap',\n      'Choose how to add your daily snap',\n      [\n        {\n          text: 'Take Photo',\n          onPress: async () =\u003e {\n            const { status } = await ImagePicker.requestCameraPermissionsAsync();\n            if (status !== 'granted') {\n              Alert.alert('Permission Required', 'Camera access is needed.');\n              return;\n            }\n            const result = await ImagePicker.launchCameraAsync({\n              mediaTypes: ['images'], allowsEditing: true, aspect: [1, 1], quality: 0.8,\n            });\n            if (!result.canceled \u0026\u0026 result.assets[0]) {\n              router.push({ pathname: '/(protected)/snap-create', params: { imageUri: result.assets[0].uri } });\n            }\n          },\n        },\n        {\n          text: 'Choose from Gallery',\n          onPress: async () =\u003e {\n            const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();\n            if (status !== 'granted') {\n              Alert.alert('Permission Required', 'Photo library access is needed.');\n              return;\n            }\n            const result = await ImagePicker.launchImageLibraryAsync({\n              mediaTypes: ['images'], allowsEditing: true, aspect: [1, 1], quality: 0.8,\n            });\n            if (!result.canceled \u0026\u0026 result.assets[0]) {\n              router.push({ pathname: '/(protected)/snap-create', params: { imageUri: result.assets[0].uri } });\n            }\n          },\n        },\n        { text: 'Cancel', style: 'cancel' },\n      ]\n    );\n  };\n  ```\n\nDo the same change in mobile/app/(protected)/home.tsx handleCameraPress function — replace the direct camera launch with the same ActionSheet pattern (keep the guest check at the top).",
+      "status": "completed",
+      "priority": 5,
+      "depends_on": [],
+      "test_command": "cd mobile \u0026\u0026 npx tsc --noEmit",
+      "auto_commit": true,
+      "created_at": "",
+      "updated_at": "2026-02-15T07:19:21Z"
+    },
+    {
+      "id": "enhance_012",
+      "title": "Add proper error boundaries and network error handling",
+      "description": "The app has no error boundary component. If any screen throws a render error, the entire app crashes. Also, network errors show raw technical messages to users.\n\nCreate mobile/components/ErrorBoundary.tsx:\n```typescript\nimport React from 'react';\nimport { View, Text, Pressable } from 'react-native';\nimport { Ionicons } from '@expo/vector-icons';\n\ninterface Props { children: React.ReactNode; }\ninterface State { hasError: boolean; error: Error | null; }\n\nexport default class ErrorBoundary extends React.Component\u003cProps, State\u003e {\n  state: State = { hasError: false, error: null };\n  static getDerivedStateFromError(error: Error) { return { hasError: true, error }; }\n  render() {\n    if (this.state.hasError) {\n      return (\n        \u003cView className=\"flex-1 bg-gray-950 items-center justify-center px-8\"\u003e\n          \u003cIonicons name=\"warning-outline\" size={64} color=\"#f97316\" /\u003e\n          \u003cText className=\"text-xl font-bold text-white mt-4\"\u003eSomething went wrong\u003c/Text\u003e\n          \u003cText className=\"text-sm text-gray-400 mt-2 text-center\"\u003eWe're sorry for the inconvenience. Please try again.\u003c/Text\u003e\n          \u003cPressable\n            onPress={() =\u003e this.setState({ hasError: false, error: null })}\n            className=\"mt-6 rounded-xl bg-orange-500 px-6 py-3\"\n          \u003e\n            \u003cText className=\"text-base font-semibold text-white\"\u003eTry Again\u003c/Text\u003e\n          \u003c/Pressable\u003e\n        \u003c/View\u003e\n      );\n    }\n    return this.props.children;\n  }\n}\n```\n\nModify mobile/app/_layout.tsx:\n- Import ErrorBoundary from '../components/ErrorBoundary'\n- Wrap children: `\u003cErrorBoundary\u003e\u003cAuthProvider\u003e\u003cSubscriptionProvider\u003e...\u003c/SubscriptionProvider\u003e\u003c/AuthProvider\u003e\u003c/ErrorBoundary\u003e`\n\nModify mobile/lib/api.ts:\n- Add response interceptor for network errors that provides user-friendly messages:\n  ```typescript\n  api.interceptors.response.use(\n    response =\u003e response,\n    error =\u003e {\n      if (!error.response) {\n        error.message = 'No internet connection. Please check your network.';\n      } else if (error.response.status \u003e= 500) {\n        error.message = 'Server error. Please try again later.';\n      }\n      return Promise.reject(error);\n    }\n  );\n  ```",
+      "status": "completed",
+      "priority": 5,
+      "depends_on": [],
+      "test_command": "cd mobile \u0026\u0026 npx tsc --noEmit",
+      "auto_commit": true,
+      "created_at": "",
+      "updated_at": "2026-02-15T07:31:26Z"
+    },
+    {
+      "id": "enhance_013",
+      "title": "Update legal pages with correct app name and privacy URL routing",
+      "description": "The legal handler at backend/internal/handlers/legal_handler.go uses hardcoded HTML with the app name 'Snapstreak'. The settings screen links to external URLs (snapstreak.app/privacy and snapstreak.app/terms) that don't exist. The backend already serves legal pages at /api/legal/privacy and /api/legal/terms — the mobile app should use these.\n\nModify mobile/app/(protected)/settings.tsx:\n1. Change the Privacy Policy onPress (line 268) from:\n   `Linking.openURL('https://snapstreak.app/privacy')`\n   to use the API URL:\n   ```typescript\n   const API_BASE = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:8080/api';\n   Linking.openURL(`${API_BASE.replace('/api', '')}/api/legal/privacy`);\n   ```\n\n2. Change the Terms of Service onPress (line 275) similarly:\n   ```typescript\n   Linking.openURL(`${API_BASE.replace('/api', '')}/api/legal/terms`);\n   ```\n\nModify backend/internal/handlers/legal_handler.go:\n1. Update the app name references from 'Snapstreak' to 'StreakSnap' throughout both HTML templates\n2. Update the last updated date from 'February 7, 2026' to 'February 14, 2026'\n3. Add viewport meta tag for mobile rendering: `\u003cmeta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\"\u003e`\n4. Add dark background styling to match the app theme: `body { background-color: #030712; color: #e5e7eb; font-family: -apple-system, sans-serif; padding: 20px; max-width: 600px; margin: 0 auto; }` and links in orange: `a { color: #f97316; }`\n5. Ensure both legal pages mention the correct contact email and include RevenueCat subscription terms in the Terms of Service page",
+      "status": "completed",
+      "priority": 5,
+      "depends_on": [],
+      "test_command": "cd backend \u0026\u0026 go build ./...",
+      "auto_commit": true,
+      "created_at": "",
+      "updated_at": "2026-02-15T07:45:20Z"
+    }
+  ]
+}

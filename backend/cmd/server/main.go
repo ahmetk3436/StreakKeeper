@@ -42,16 +42,24 @@ func main() {
 	authService := services.NewAuthService(database.DB, cfg)
 	subscriptionService := services.NewSubscriptionService(database.DB)
 	moderationService := services.NewModerationService(database.DB)
+	snapService := services.NewSnapService(database.DB)
 
 	// Handlers
 	authHandler := handlers.NewAuthHandler(authService)
 	healthHandler := handlers.NewHealthHandler()
 	webhookHandler := handlers.NewWebhookHandler(subscriptionService, cfg)
 	moderationHandler := handlers.NewModerationHandler(moderationService)
+	snapHandler := handlers.NewSnapHandler(snapService)
+	legalHandler := handlers.NewLegalHandler()
+
+	// Create uploads directory for snap images
+	if err := os.MkdirAll("./uploads/snaps", 0755); err != nil {
+		log.Printf("Warning: Could not create uploads directory: %v", err)
+	}
 
 	// Fiber app
 	app := fiber.New(fiber.Config{
-		BodyLimit:    4 * 1024 * 1024, // 4MB
+		BodyLimit:    12 * 1024 * 1024, // 12MB (10MB image + form overhead)
 		ErrorHandler: customErrorHandler,
 	})
 
@@ -63,6 +71,9 @@ func main() {
 	}))
 	app.Use(middleware.CORS(cfg))
 
+	// Serve static files for uploaded images
+	app.Static("/uploads", "./uploads")
+
 	// Rate limiter on auth endpoints
 	authLimiter := limiter.New(limiter.Config{
 		Max:               20,
@@ -72,7 +83,7 @@ func main() {
 	app.Use("/api/auth", authLimiter)
 
 	// Routes
-	routes.Setup(app, cfg, authHandler, healthHandler, webhookHandler, moderationHandler)
+	routes.Setup(app, cfg, authHandler, healthHandler, webhookHandler, moderationHandler, snapHandler, legalHandler)
 
 	// Graceful shutdown
 	quit := make(chan os.Signal, 1)

@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
-import { View, Text, KeyboardAvoidingView, Platform } from 'react-native';
+import { View, Text, KeyboardAvoidingView, Platform, ScrollView } from 'react-native';
 import { Link } from 'expo-router';
+import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../../contexts/AuthContext';
 import Button from '../../components/ui/Button';
 import Input from '../../components/ui/Input';
@@ -45,71 +46,92 @@ export default function RegisterScreen() {
 
   return (
     <KeyboardAvoidingView
-      className="flex-1 bg-white"
+      className="flex-1 bg-gray-950"
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
     >
-      <View className="flex-1 justify-center px-8">
-        <Text className="mb-2 text-3xl font-bold text-gray-900">
-          Create account
-        </Text>
-        <Text className="mb-8 text-base text-gray-500">
-          Start building something great
-        </Text>
+      <ScrollView
+        className="flex-1"
+        contentContainerStyle={{ flexGrow: 1 }}
+        keyboardShouldPersistTaps="handled"
+      >
+        {/* Decorative Header */}
+        <View
+          className="bg-orange-600 items-center justify-center"
+          style={{
+            height: 180,
+            borderBottomLeftRadius: 24,
+            borderBottomRightRadius: 24,
+          }}
+        >
+          <Ionicons name="flame" size={48} color="white" />
+          <Text className="text-white text-2xl font-bold mt-2">
+            Snapstreak
+          </Text>
+        </View>
 
-        {error ? (
-          <View className="mb-4 rounded-lg bg-red-50 p-3">
-            <Text className="text-sm text-red-600">{error}</Text>
+        <View className="flex-1 justify-center px-8 pt-8">
+          <Text className="mb-2 text-3xl font-bold text-white">
+            Create account
+          </Text>
+          <Text className="mb-8 text-base text-gray-400">
+            Start your streak today
+          </Text>
+
+          {error ? (
+            <View className="mb-4 rounded-lg bg-red-900/30 p-3">
+              <Text className="text-sm text-red-400">{error}</Text>
+            </View>
+          ) : null}
+
+          <View className="mb-4">
+            <Input
+              label="Email"
+              placeholder="you@example.com"
+              value={email}
+              onChangeText={setEmail}
+              autoCapitalize="none"
+              keyboardType="email-address"
+              textContentType="emailAddress"
+            />
           </View>
-        ) : null}
 
-        <View className="mb-4">
-          <Input
-            label="Email"
-            placeholder="you@example.com"
-            value={email}
-            onChangeText={setEmail}
-            autoCapitalize="none"
-            keyboardType="email-address"
-            textContentType="emailAddress"
+          <View className="mb-4">
+            <Input
+              label="Password"
+              placeholder="Min. 8 characters"
+              value={password}
+              onChangeText={setPassword}
+              secureTextEntry
+              textContentType="newPassword"
+            />
+          </View>
+
+          <View className="mb-6">
+            <Input
+              label="Confirm Password"
+              placeholder="Repeat your password"
+              value={confirmPassword}
+              onChangeText={setConfirmPassword}
+              secureTextEntry
+              textContentType="newPassword"
+            />
+          </View>
+
+          <Button
+            title="Create Account"
+            onPress={handleRegister}
+            isLoading={isLoading}
+            size="lg"
           />
-        </View>
 
-        <View className="mb-4">
-          <Input
-            label="Password"
-            placeholder="Min. 8 characters"
-            value={password}
-            onChangeText={setPassword}
-            secureTextEntry
-            textContentType="newPassword"
-          />
+          <View className="mt-6 flex-row items-center justify-center pb-8">
+            <Text className="text-gray-400">Already have an account? </Text>
+            <Link href="/(auth)/login" asChild>
+              <Text className="font-semibold text-orange-500">Sign In</Text>
+            </Link>
+          </View>
         </View>
-
-        <View className="mb-6">
-          <Input
-            label="Confirm Password"
-            placeholder="Repeat your password"
-            value={confirmPassword}
-            onChangeText={setConfirmPassword}
-            secureTextEntry
-            textContentType="newPassword"
-          />
-        </View>
-
-        <Button
-          title="Create Account"
-          onPress={handleRegister}
-          isLoading={isLoading}
-          size="lg"
-        />
-
-        <View className="mt-6 flex-row items-center justify-center">
-          <Text className="text-gray-500">Already have an account? </Text>
-          <Link href="/(auth)/login" asChild>
-            <Text className="font-semibold text-primary-600">Sign In</Text>
-          </Link>
-        </View>
-      </View>
+      </ScrollView>
     </KeyboardAvoidingView>
   );
 }
